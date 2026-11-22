@@ -1,121 +1,215 @@
 import * as Phaser from 'phaser'
-import { CORE_HP, CORE_X, DEFENDERS, ENEMIES, ENTRY_X, HEIGHT, LANES, SLOTS, STEP_MS, WIDTH } from './sim/data'
+import { CORE_HP, CORE_X, ENEMIES, ENTRY_X, LANES, OVERTIME_TICK, SLOTS, STEP_MS, WIDTH, profile } from './sim/data'
 import type { Effect, Match, Phase } from './sim/match'
+import { drawArena, drawFighter } from './field-art'
+import type { BattleSound } from './sound'
+
+type Point = { from: number; to: number }
 
 export class Battlefield extends Phaser.Scene {
+  private art!: Phaser.GameObjects.Graphics
   private graphics!: Phaser.GameObjects.Graphics
+  private damageText: { label: Phaser.GameObjects.Text; age: number; start: number }[] = []
   private accumulator = 0
+  private clock = 0
+  private coil = false
+  private points = new Map<number, Point>()
+  private lunges = new Map<number, { start: number; direction: number }>()
+  private flashes = new Map<number, number>()
   private effects: { effect: Effect; age: number }[] = []
 
   constructor(
     private readonly match: () => Match,
     private readonly onChange: (phase: Phase) => void,
     private readonly speed: () => number,
-  ) {
-    super('battlefield')
-  }
+    private readonly audio: BattleSound,
+  ) { super('battlefield') }
 
   create() {
-    const vertical = this.add.graphics()
-    for (let x = 20; x < WIDTH; x += 40) {
-      vertical.lineStyle(1, 0x36536a, .19).lineBetween(x, 0, x, HEIGHT)
-    }
-    this.add.text(45, 56, 'THE CORE', { fontSize: '20px', color: '#9ff1de' })
-    this.add.text(1060, 56, 'RIFT ENTRY', { fontSize: '20px', color: '#ffa6a4' })
-    const terrain = this.add.graphics()
-    for (const [index, y] of LANES.entries()) {
-      terrain.fillStyle(0x192a39).fillRoundedRect(24, y - 63, 1232, 126, 12)
-      terrain.lineStyle(1, 0x355065).strokeRoundedRect(24, y - 63, 1232, 126, 12)
-      terrain.lineStyle(1, 0x355065).lineBetween(CORE_X, y, ENTRY_X, y)
-      terrain.lineStyle(4, 0xb15b70).lineBetween(ENTRY_X + 17, y - 36, ENTRY_X + 17, y + 36)
-      for (const x of SLOTS) {
-        terrain.fillStyle(0x22394b).fillRoundedRect(x - 38, y - 39, 76, 78, 5)
-      }
-      this.add.text(45, y - 48, `LANE ${index + 1}`, { fontSize: '15px', color: '#a4bac9' })
-      terrain.lineStyle(2, 0x723e68, .8).strokeEllipse(ENTRY_X + 15, y, 55, 112)
-      terrain.lineStyle(3, 0xa95f84, .55).strokeEllipse(ENTRY_X + 15, y, 37, 93)
-    }
-    this.add.text(46, 660, 'Guard ■     Archer ▲     Scavenger ◆', { fontSize: '17px', color: '#a4bac9' })
-    for (const [index, kind] of (['basic', 'fast', 'armored'] as const).entries()) {
-      const x = 917 + 114 * index
-      this.add.text(x, 660, ENEMIES[kind].label, { fontSize: '17px', color: '#' + ENEMIES[kind].color.toString(16) })
-    }
+    this.art = this.add.graphics()
+    drawArena(this.art, false)
     this.graphics = this.add.graphics()
+    for (const [lane, y] of LANES.entries()) {
+      this.add.text(53, y - 43, String(lane + 1), {
+        fontFamily: 'system-ui', fontSize: '19px', fontStyle: 'bold', color: '#f7d1a0',
+        stroke: '#241b2d', strokeThickness: 5,
+      }).setDepth(1)
+    }
   }
 
   resetEffects() {
     this.accumulator = 0
+    this.points.clear()
+    this.flashes.clear()
+    this.lunges.clear()
     this.effects = []
+    for (const { label } of this.damageText) label.destroy()
+    this.damageText = []
+    this.cameras.main.resetFX()
   }
 
   update(_time: number, delta: number) {
     const match = this.match()
     const previous = match.view.phase
-    const { scrap, core, spawned } = match.view
-    for (const entry of this.effects) entry.age += delta
-    this.effects = this.effects.filter(entry => entry.age < 480)
+    const { scrap, core, spawned, tick } = match.view
+    const speed = this.speed()
+    const elapsed = Math.min(delta, 100)
+    if (speed > 0) {
+      this.clock += elapsed
+      for (const entry of this.effects) entry.age += elapsed
+      this.effects = this.effects.filter(entry => entry.age < 500)
+      for (const [id, lunge] of this.lunges) if (lunge.start + 180 < this.clock) this.lunges.delete(id)
+      for (const [id, until] of this.flashes) if (until < this.clock) this.flashes.delete(id)
+      this.damageText = this.damageText.filter(entry => {
+        entry.age += elapsed
+        if (entry.age >= 450) { entry.label.destroy(); return false }
+        entry.label.setY(entry.start - entry.age * .066).setAlpha(1 - entry.age / 500)
+        return true
+      })
+    }
     if (previous === 'battle') {
-      this.accumulator += Math.min(delta, 250) * this.speed()
+      this.accumulator += elapsed * speed
       while (this.accumulator >= STEP_MS && match.view.phase === 'battle') {
         this.accumulator -= STEP_MS
-        for (const effect of match.tick()) this.effects.push({ effect, age: 0 })
+        const last = new Map([...match.view.defenders, ...match.view.enemies].map(unit => [unit.id, unit.x]))
+        const effects = match.tick()
+        this.points = new Map([...match.view.defenders, ...match.view.enemies].map(unit =>
+          [unit.id, { from: last.get(unit.id) ?? unit.x, to: unit.x }]))
+        for (const effect of effects) this.present(effect)
       }
     }
-    if (match.view.phase !== 'battle') this.accumulator = 0
-    if (previous !== match.view.phase || scrap !== match.view.scrap || core !== match.view.core ||
-        spawned !== match.view.spawned) {
+    if (match.view.phase !== 'battle') {
+      this.accumulator = 0
+      this.points.clear()
+    }
+    if (previous !== match.view.phase || scrap !== match.view.scrap || core !== match.view.core || spawned !== match.view.spawned || (tick < OVERTIME_TICK && match.view.tick >= OVERTIME_TICK)) {
       this.onChange(match.view.phase)
     }
+    if (this.coil !== (match.view.era === 'coil')) {
+      this.coil = !this.coil
+      this.art.clear()
+      drawArena(this.art, this.coil)
+    }
     this.renderMatch(match.view)
+  }
+
+  private present(effect: Effect) {
+    this.effects.push({ effect, age: 0 })
+    this.audio.play(effect)
+    if (effect.type === 'breach' || effect.type === 'blast') {
+      if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) this.cameras.main.shake(125, .003)
+    }
+    if (effect.type === 'blast' || effect.type === 'fall') return
+    const breach = effect.type === 'breach'
+    const heal = !breach && effect.style === 'heal'
+    if (!breach) {
+      this.flashes.set(effect.target, this.clock + 105)
+      this.lunges.set(effect.source, { start: this.clock, direction: Math.sign(effect.to - effect.from) })
+    }
+    if (!breach && !heal && effect.amount < 20) return
+    const x = breach ? CORE_X : effect.to
+    const y = LANES[effect.lane] - (breach ? 57 : 46)
+    const label = this.add.text(x, y, `${heal ? '+' : '−'}${effect.amount}`, {
+      fontFamily: 'system-ui', fontSize: breach ? '27px' : '19px', fontStyle: 'bold',
+      color: heal ? '#c1fb9b' : breach ? '#ff8f87' : '#fff4df', stroke: '#201826', strokeThickness: 5,
+    }).setOrigin(.5).setDepth(2)
+    this.damageText.push({ label, age: 0, start: y })
   }
 
   private renderMatch(state: Match['view']) {
     const g = this.graphics
     g.clear()
-
-    g.lineStyle(9, 0x487b83).lineBetween(CORE_X - 8, 211, CORE_X - 8, 609)
+    const building = state.phase === 'build'
     for (const y of LANES) {
-      g.fillStyle(state.core > 0 ? 0x8ce4d0 : 0x834b5a).fillCircle(CORE_X - 8, y, 16)
-      this.health(CORE_X - 8, y - 30, state.core / CORE_HP, 0x8ce4d0)
+      const light = this.coil ? 0xc7b9ff : 0x90f7ce
+      g.fillStyle(light, .12 + state.core / CORE_HP * .2).fillCircle(CORE_X, y - 12, 36)
+      g.fillStyle(state.core ? light : 0x613648).fillTriangle(CORE_X - 17, y - 10, CORE_X, y - 38, CORE_X + 17, y - 10)
+        .fillTriangle(CORE_X - 17, y - 10, CORE_X, y + 16, CORE_X + 17, y - 10)
+      g.lineStyle(2, 0xffffff, .65).lineBetween(CORE_X, y - 35, CORE_X - 8, y - 8)
+      this.health(CORE_X, y + 31, state.core / CORE_HP, light, 56)
+      const rift = .23 + Math.sin(this.clock / 305 + y) * .1
+      g.fillStyle(0xfb73af, rift).fillEllipse(ENTRY_X + 24, y - 15, 34, 89)
+      g.lineStyle(2, 0xffafd3, rift + .22).strokeEllipse(ENTRY_X + 24, y - 15, 30, 93)
+    }
+    for (const enemy of state.enemies) {
+      const def = ENEMIES[enemy.kind]
+      if (enemy.pulseX !== undefined && def.pulse) {
+        const y = LANES[enemy.lane]
+        const intensity = .3 + .25 * Math.sin(this.clock / 70)
+        g.fillStyle(0xfc4d70, intensity).fillEllipse(enemy.pulseX, y + 7, def.pulse.radius * 2, 86)
+        g.lineStyle(4, 0xffa788, .85).strokeEllipse(enemy.pulseX, y + 7, def.pulse.radius * 2, 86)
+      }
+      if (def.aura) g.lineStyle(2, def.color, .28).strokeEllipse(this.x(enemy), LANES[enemy.lane] + 11, def.aura * 2, 61)
     }
     for (const unit of state.defenders) {
+      if (unit.hp <= 0) continue
+      const def = profile(unit)
       const y = LANES[unit.lane]
-      const { color, hp } = DEFENDERS[unit.kind]
-      g.fillStyle(color)
-      if (unit.kind === 'guard') g.fillRoundedRect(unit.x - 18, y - 18, 36, 36, 5)
-      if (unit.kind === 'archer') g.fillTriangle(unit.x - 20, y + 18, unit.x, y - 21, unit.x + 20, y + 18)
-      if (unit.kind === 'scavenger') g.fillTriangle(unit.x - 19, y, unit.x, y - 21, unit.x + 19, y)
-        .fillTriangle(unit.x - 19, y, unit.x, y + 21, unit.x + 19, y)
-      this.health(unit.x, y - 30, unit.hp / hp, color)
+      const x = this.x(unit)
+      if (!building && def.advance) {
+        g.lineStyle(2, def.color, .35).lineBetween(SLOTS[unit.slot], y + 21, x, y + 21)
+      }
+      drawFighter(g, x, y, unit.kind, def.color, 1, this.pose(unit.id), this.flashes.has(unit.id), unit.upgrade)
+      if (!building || unit.upgrade) this.health(x, y - 51, unit.hp / def.hp, def.color)
     }
     for (const unit of state.enemies) {
-      const y = LANES[unit.lane]
-      const { color, hp } = ENEMIES[unit.kind]
-      g.fillStyle(color)
-      if (unit.kind === 'basic') g.fillCircle(unit.x, y, 15)
-      if (unit.kind === 'fast') g.fillTriangle(unit.x - 22, y, unit.x + 13, y - 12, unit.x + 13, y + 12)
-      if (unit.kind === 'armored') {
-        g.fillRoundedRect(unit.x - 19, y - 20, 38, 40, 7)
-        g.lineStyle(3, 0x71395f).strokeRoundedRect(unit.x - 13, y - 14, 26, 28, 4)
-      }
-      this.health(unit.x, y - 30, unit.hp / hp, color)
+      if (unit.hp <= 0) continue
+      const def = ENEMIES[unit.kind]
+      const y = LANES[unit.lane] + (unit.kind === 'colossus' ? 0 : (unit.id % 5 - 2) * 5)
+      const x = this.x(unit)
+      drawFighter(g, x, y, unit.kind, def.color, -1, this.pose(unit.id), this.flashes.has(unit.id))
+      this.health(x, y - (unit.kind === 'colossus' ? 84 : 51), unit.hp / def.hp, def.color, unit.kind === 'colossus' ? 90 : 42)
+      if (unit.slow) g.lineStyle(3, 0x9cddff, .68).strokeEllipse(x, y + 19, 51, 15)
+      if (unit.expose) g.lineStyle(3, 0xffe29c).lineBetween(x - 10, y - 45, x + 10, y - 45)
     }
     for (const { effect, age } of this.effects) {
       const y = LANES[effect.lane]
-      if (effect.type === 'hit' && age < 180) {
-        g.lineStyle(3, effect.color, 1 - age / 180).lineBetween(effect.from, y, effect.to, y)
-        g.fillStyle(0xffffff, 1 - age / 180).fillCircle(effect.to, y, 5)
-      }
-      if (effect.type === 'income' || effect.type === 'breach') {
-        const x = effect.type === 'income' ? effect.x : CORE_X - 8
-        const color = effect.type === 'income' ? DEFENDERS.scavenger.color : 0xff827e
-        g.lineStyle(3, color, 1 - age / 480).strokeCircle(x, y, 18 + age / 17)
+      const fade = 1 - age / 500
+      if (effect.type === 'hit') {
+        const duration = effect.style === 'shell' ? 220 : 125
+        const t = Math.min(1, age / duration)
+        if (effect.style === 'coil' || effect.style === 'heal') {
+          if (age > 180) continue
+          g.lineStyle(3, effect.color, 1 - age / 190).lineBetween(effect.from, y - 16, effect.to, y - 13)
+        } else if (t < 1 && effect.style !== 'strike') {
+          const x = effect.from + (effect.to - effect.from) * t
+          const lift = Math.sin(t * Math.PI) * (effect.style === 'shell' ? 115 : 16)
+          g.fillStyle(effect.color).fillCircle(x, y - 15 - lift, effect.style === 'shell' ? 8 : 4)
+          g.lineStyle(3, effect.color, .58).lineBetween(x - Math.sign(effect.to - effect.from) * 19, y - 16 - lift, x, y - 15 - lift)
+        } else if (age < 330) {
+          const burst = Math.max(0, age - (effect.style === 'strike' ? 0 : duration))
+          g.lineStyle(3, effect.color, 1 - age / 350).strokeEllipse(effect.to, y - 10, 18 + burst * .37, 14 + burst * .14)
+          if (effect.splash) g.fillStyle(effect.color, fade * .13).fillEllipse(effect.to, y, effect.splash * 2, 52)
+        }
+      } else if (effect.type === 'fall') {
+        for (let i = 0; i < 7; i++) {
+          const angle = i * Math.PI * 2 / 7
+          g.fillStyle(effect.color, fade).fillCircle(effect.x + Math.cos(angle) * age / 10,
+            y - 12 + Math.sin(angle) * age / 13, 5 * fade)
+        }
+      } else {
+        const x = effect.type === 'blast' ? effect.x : CORE_X
+        const width = effect.type === 'blast' ? effect.radius * 2 : 110
+        g.fillStyle(0xff634c, fade * .36).fillEllipse(x, y, width, 84)
+        g.lineStyle(4, 0xffb777, fade).strokeEllipse(x, y, width, 84 + age / 13)
       }
     }
   }
 
-  private health(x: number, y: number, fraction: number, color: number) {
-    this.graphics.fillStyle(0x080e16).fillRect(x - 20, y, 40, 5)
-    this.graphics.fillStyle(color).fillRect(x - 20, y, 40 * fraction, 5)
+  private x(unit: { id: number; x: number }) {
+    const point = this.points.get(unit.id)
+    const position = point ? Phaser.Math.Linear(point.from, point.to, Math.min(1, this.accumulator / STEP_MS)) : unit.x
+    const lunge = this.lunges.get(unit.id)
+    return lunge ? position + Math.sin(Math.PI * (this.clock - lunge.start) / 180) * 9 * lunge.direction : position
+  }
+
+  private pose(id: number) {
+    const point = this.points.get(id)
+    return point && point.from !== point.to ? Math.sin(this.clock / 63 + id) : 0
+  }
+
+  private health(x: number, y: number, ratio: number, color: number, width = 42) {
+    this.graphics.fillStyle(0x161521).fillRoundedRect(x - width / 2 - 2, y - 2, width + 4, 9, 3)
+    this.graphics.fillStyle(color).fillRect(x - width / 2, y, width * ratio, 5)
   }
 }

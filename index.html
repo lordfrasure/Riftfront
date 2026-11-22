@@ -3,55 +3,61 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Riftfront: Ages Under Siege</title>
+  <title>Riftfront · Ages Under Siege</title>
 </head>
 <body>
   <main>
-    <header>
-      <h1>Riftfront <span>Ages Under Siege</span></h1>
+    <header class="masthead">
+      <div><span class="subtitle">Ages Under Siege</span><h1>Riftfront</h1></div>
       <div class="metrics">
-        <div>Scrap <strong id="scrap">110</strong></div>
-        <div>Core <strong id="core">100 / 100</strong></div>
-        <div>Wave <strong id="wave">1 / 5</strong></div>
+        <div>Scrap <strong id="scrap"></strong></div>
+        <div>Core <strong id="core"></strong></div>
+        <div>Wave <strong id="wave"></strong></div>
       </div>
     </header>
-    <section class="orders" aria-label="Defenders">
-      <div id="units"></div>
-    </section>
-    <p id="feedback" role="status">Choose a defender and an open pad, then start the wave.</p>
+    <div class="commandbar">
+      <strong id="era"></strong>
+      <button id="advance"></button>
+      <div class="actions">
+        <button id="restart">Restart</button>
+        <button id="mute" aria-pressed="false">Sound off</button>
+        <button id="speed" aria-pressed="false">2× speed</button>
+        <button id="pause" aria-pressed="false">Pause</button>
+        <button id="start" class="primary">Start wave</button>
+      </div>
+    </div>
     <div class="match">
       <section class="field" aria-label="Three-lane battlefield">
         <div id="game" aria-hidden="true"></div>
-        <div id="pads" role="group" aria-label="Placement pads"></div>
+        <div id="pads" role="group" aria-label="Formation pads"></div>
+        <div id="paused" class="paused" hidden>Paused</div>
         <div id="result" class="result" hidden>
-          <section>
-            <h2 id="outcome"></h2>
-            <p id="summary"></p>
-            <button id="replay" class="primary">Play again</button>
-          </section>
+          <section><h2 id="outcome"></h2><p id="summary"></p><button id="replay" class="primary">Play again</button></section>
         </div>
       </section>
-      <section class="intel" aria-label="Wave information">
-        <div>
-          <h2 id="intel-heading">Incoming wave</h2>
+      <aside class="intel" aria-label="Wave intelligence">
+        <section>
+          <span id="intel-heading" class="subtitle"></span>
+          <h2 id="wave-title"></h2>
+          <p id="tip"></p>
           <ul id="forecast"></ul>
-          <p id="armor-note" hidden></p>
+          <details id="threats"><summary>Enemy abilities</summary><div id="threat-list"></div></details>
+        </section>
+        <section id="report" hidden>
+          <h2 id="report-heading"></h2>
+          <p id="report-damage"></p><p id="report-losses"></p><p id="report-economy"></p>
+        </section>
+      </aside>
+      <section class="workbench" aria-label="Formation orders">
+        <p id="feedback" role="status"></p>
+        <div id="inspector" hidden>
+          <div><strong id="unit-name"></strong><p id="unit-role"></p></div>
+          <div id="retrofits"></div>
+          <div class="actions"><button id="move"></button><button id="retire"></button></div>
         </div>
-        <div id="report" hidden>
-          <h2 id="report-heading">Wave report</h2>
-          <p id="report-economy"></p>
-          <p id="report-losses"></p>
-          <p id="report-damage"></p>
-        </div>
+        <div id="units" role="group" aria-label="Recruit defenders"></div>
       </section>
     </div>
-    <section class="orders" aria-label="Orders">
-      <div class="actions">
-        <button id="restart">Restart</button>
-        <button id="speed" aria-pressed="false">2× speed</button>
-        <button id="start" class="primary">Start wave 1</button>
-      </div>
-    </section>
   </main>
   <script type="module" src="/src/main.ts"></script>
 </body>

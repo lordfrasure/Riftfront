@@ -1,6 +1,6 @@
 # Riftfront: Ages Under Siege
 
-Defend a shared core through five waves in this single-player, three-lane tower defense prototype. Built with Phaser 4, TypeScript, and Vite.
+Build a living formation, advance from the Ember Age to the Coil Age, and defend the core through ten assaults in this single-player, three-lane strategy game. Built with Phaser 4, TypeScript, and Vite.
 
 ## Run locally
 
@@ -8,20 +8,22 @@ Use Node.js 18 or newer and npm.
 
 ```sh
 npm ci
-npm run dev
+npm run build
+npm run preview -- --host 127.0.0.1
 ```
 
-Open the local URL printed by Vite. Select a defender, choose an open pad, then start the wave. Use Tab and Enter or Space to play with a keyboard. Hover over or focus an open pad to preview the selected unit's attack range. Select an occupied pad during build to inspect its defender's health.
+Open http://127.0.0.1:4173/ or the local URL printed by Vite. Recruit defenders and assign them to lane pads. Guards advance to meet enemies, while ranged and support units work behind them. Check the forecast before deploying and inspect an occupied pad to redeploy, retire, or retrofit a defender.
 
-Check the forecast before spending scrap and read the wave report before reinforcing. Toggle **2× speed** to advance battles faster.
+Use Tab and Enter or Space to play with a keyboard. The battle controls offer pause, double speed, and optional sound. Check the wave report before committing to the next assault.
 
-Vite's development server blocks paths with a colon, including a folder named `Riftfront: Ages Under Siege`. In that folder, use `npm run build` followed by `npm run preview`. Use a folder named `Riftfront` for development with hot reload.
+Vite's development server returns a 403 for project paths containing a colon, including `Riftfront: Ages Under Siege`. The preview commands above work from that folder. To use hot reload, open the project from a path without a colon and run `npm run dev -- --host 127.0.0.1`.
 
 ## Verify changes
 
 ```sh
 npm test
 npm run build
+npm run balance -- --sweep
 ```
 
 The test command compiles the simulation without browser types and runs the headless scenarios in Node. The build type-checks the full application and writes the production site to `dist/`. For gameplay changes, also check placement, battle progression, the wave report, and restart in a browser at desktop and narrow widths.

@@ -16,7 +16,7 @@ Build a living formation of frontline defenders, ranged attackers, support struc
 4. **Age of War:** Thrilling and obvious advancement across technological eras; avoid simply replacing every old unit with a strictly better one.
 5. **South Park Tower Defense:** Expressive humor, character, optional special actions. Avoid compulsory manual combat and character-swapping in solo play.
 
-## Prototype baseline
+## Historical prototype baseline
 - 1280×720 browser battlefield, **3 horizontal lanes**.
 - Enemies come from right toward a core on left.
 - **3 defenders:** Guard (frontline), Archer (ranged), Scavenger (resource income).
@@ -25,7 +25,7 @@ Build a living formation of frontline defenders, ranged attackers, support struc
 - Lane forecasts, range previews, defender health inspection, and a report after each wave. See [current game rules](GAME_DESIGN.md).
 - Geometric placeholders are fine. Tests, build and runnable browser loop are required.
 
-Do not assume the prototype is complete; inspect files/tests and report what is actually implemented. Do not interrupt or rewrite a working game just to incorporate this brief.
+This baseline predates the ten-wave overhaul. See [the current gameplay rules](GAME_DESIGN.md) and [roadmap](ROADMAP.md) for implementation status. Do not interrupt or rewrite a working game just to incorporate this brief.
 
 ## Essential design rules
 - **Meaningful choice above feature count.** Every new unit or upgrade must solve a distinct problem, create a synergy, or force a tradeoff.

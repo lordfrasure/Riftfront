@@ -1,24 +1,51 @@
 # Riftfront: Ages Under Siege
 
-Protect a shared core through five handcrafted waves on a 1280 × 720 battlefield. Enemies move from right to left in three lanes. Each lane has four fixed placement pads. The wave forecast lists the enemy mix in each lane.
+Form a three-lane garrison, survive ten assaults, and kill the Rift Colossus before it reaches the core. Each wave starts when you give the order. Review the incoming lineup and prepare for the threats that matter in each lane.
 
-## Match rules
+## The match
 
-- Start with 110 scrap and 100 core HP. Select a defender and click an empty pad during build. Start every wave manually when ready.
-- Defenders stay on their pad and attack the closest enemy ahead in their lane and range. Enemies stop at the first defender in their way and attack it until it falls. Surviving defenders carry their health between waves.
-- Kills pay 5–11 scrap. Finishing any of the first four waves grants 55 scrap and returns to build. Scavengers generate scrap during battle, and their partial income timer carries into the next wave.
-- Basic enemies breach for 10 core damage, Fast for 8, and Armored for 18. Armor subtracts 5 from every incoming hit with a minimum of 1 damage. Victory requires surviving the full fifth wave with the core intact. At zero core HP the match ends in defeat.
-- The first wave attacks lanes 1 and 2. An early Scavenger can earn scrap safely in lane 3 during wave one. Buying it leaves less scrap for the first defense, and the next wave brings Fast enemies to lane 3. Later waves mix armor and speed across all lanes.
-- Hover over or focus an open pad to preview the selected defender's forward attack range. An Archer one pad behind a blocker can target enemies engaged with it. Select an occupied pad during build to check the defender's current HP.
-- The latest wave report lists kills, defenders lost, actual core damage by lane, and the scrap earned from bounties, Scavengers, and any clear bonus. The deployment counter tracks how many enemies have entered the battlefield.
-- Restart resets the full match at any time. The result screen also offers a replay.
+- Begin in the Ember Age with 120 scrap and 100 core integrity. Each lane has four pads. The core is on the left and the rifts are on the right.
+- Recruit a defender, then select an empty pad. Hover or focus the pad to preview forward reach, including a melee defender’s advance. Inspect an occupied pad to see its stats and orders.
+- Guards and their retrofits advance toward live enemies within a fixed leash. Ranged damage dealers can step forward a little to acquire a target. Closest enemies normally take priority. Enemy melee stops at the first reachable defender, while ranged enemies can engage from farther out.
+- Routed defenders lose their contribution for the wave. After a successful defense, all defenders rally to their pads at full health. Core damage persists. A battle that reaches 35 seconds enters overtime. Enemies deal 8 more damage per hit, rising by another 8 every five seconds until the wave resolves.
+- Kills and wave grants pay scrap. Later kills pay smaller bounties as the enemy count rises. A surviving Scavenger pays 11 scrap per completed wave, with a match limit of two Scavengers. Battle duration does not change salvage.
+- Redeploy a defender to an open pad for 8 scrap, including across lanes. Retiring returns one third of the base recruit price, rounded down. Retrofit spending has no resale value.
+- Starting at wave 4, advancing to the Coil Age costs 36 scrap and unlocks Coilcasters and permanent retrofits for Guards and Archers. You can delay the purchase to reinforce a lane first.
+- The wave report lists defeated enemies, routed defenders, scrap by source, and core damage by lane. Pause stops the simulation and its combat animations. The 2× toggle advances the same fixed ticks faster. Sound is optional.
 
-| Defender | Cost | HP | Behavior |
-| --- | ---: | ---: | --- |
-| Guard | 35 | 125 | Blocks enemies and deals 15 damage every 0.7 s within 39 pixels |
-| Archer | 45 | 65 | Deals 17 damage every 0.75 s within 223 pixels |
-| Scavenger | 30 | 50 | Produces 7 scrap per 3 s of battle and has no attack |
+## Defenders
 
-## Architecture
+| Defender | Scrap | Job |
+| --- | ---: | --- |
+| Guard | 34 | Leashed melee interceptor. Keeps ranged fire and healing behind the line. |
+| Archer | 40 | Consistent single-target damage. Works best with an interceptor holding enemies in reach. |
+| Scavenger | 32 | Invests a pad and immediate scrap for future income. Keep it behind the fighting. |
+| Cinder Lobber | 50 | Throws a slow shell that hits nearby enemies. Strong against packs converging on a Guard. |
+| Mender | 39 | Heals the lowest-health-percentage ally in range in its lane. Routed defenders cannot be healed during combat. |
+| Coilcaster | 58 | Slows movement and reduces armor by 7 for follow-up hits. Coil Age recruit. |
 
-The simulation advances in 50 ms ticks. Spawn schedules and target ordering are deterministic. The simulation validates typed placement and start commands and publishes a read-only view, a wave report, and transient effects. Phaser draws the view and effects while HTML provides the forecast, report, and keyboard-focusable controls. The 2× toggle runs the same sequence of simulation ticks at twice the rate.
+| Base | Retrofit | Scrap | Change |
+| --- | --- | ---: | --- |
+| Guard | Bastion | 48 | Extra health and armor, shorter advance. Keeps fights close to the supporting formation. |
+| Guard | Vanguard | 48 | Longer advance and sweeping melee hits. Clears clusters quickly and risks moving beyond support. |
+| Archer | Volley | 47 | Fast fire punishes light enemies or targets exposed by a Coilcaster. |
+| Archer | Longshot | 47 | Heavy shots pierce 12 armor and prioritize the enemy with the highest maximum health in range. |
+
+## The siege
+
+| Enemy | Pressure |
+| --- | --- |
+| Raider | Straightforward melee infantry that rewards an early interceptor. |
+| Skitter | Rushes in packs. Use splash or rapid arrows. |
+| Iron Ram | Has 10 armor and a strong opening charge. Use an armored front and armor-piercing attacks. |
+| Spitter | Fires from outside melee range. Use long-range fire or let a protected front close the distance. |
+| Herald | Gives nearby allies 5 armor. The aura is visible around it. Longshot or armor exposure can keep its escorts from stalling a lane. |
+| Rift Colossus | The final center-lane boss. Marks a circular area before a crushing blast. Spread support behind the line and reserve a way through its plate. An unblocked Colossus destroys the core. |
+
+The opening introduces coverage and clustered rushes, then single armored threats and ranged fire. Protected armor, sustained ranged waves, and a heavily contested center follow. The final assault sends the Colossus through the center while the outer lanes face separate attacks.
+
+## Implementation and verification
+
+The simulation advances every 50 ms and uses typed build orders, deterministic target ordering, and data-defined wave schedules, profiles, and retrofits. Phaser interpolates successive tick positions and renders the read-only match view. Typed effects drive hits, projectiles, death particles, boss bursts, and optional synthesized audio. HTML controls handle keyboard and touch orders.
+
+Run `npm test` for simulation mechanics and regression runs. Run `npm run balance -- --sweep` for named campaigns plus 32 branch and support combinations and runs with one defender kind removed at a time. The harness reports leaks, duration, routed defenders, and income. Its scripted purchases are a comparative baseline and do not measure how well a new player discovers the counters.
