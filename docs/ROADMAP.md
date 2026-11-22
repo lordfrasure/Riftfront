@@ -1,5 +1,7 @@
 # Roadmap
 
+See the [development plan](DEVELOPMENT_PLAN.md) for milestone scope and verification. These playtest priorities apply to the current campaign.
+
 The current single-player run spans ten waves and two eras. Its main design bets are leashed interceptors, ranged and support synergies, useful retrofits, and telegraphed waves that reward formation changes.
 
 1. Observe fresh players through the first loss or victory. Record placement mistakes, when players buy a retrofit, and what they infer from the wave report. Tune how the field communicates support reach and threat counters.

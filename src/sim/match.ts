@@ -40,7 +40,7 @@ export type Command =
 export type Effect =
   | { type: 'hit'; lane: Lane; from: number; to: number; color: number; amount: number;
       source: number; target: number; style: 'strike' | 'arrow' | 'shell' | 'coil' | 'acid' | 'heal'; splash?: number }
-  | { type: 'fall'; lane: Lane; x: number; color: number }
+  | { type: 'fall'; id: number; lane: Lane; x: number; color: number }
   | { type: 'blast'; lane: Lane; x: number; radius: number }
   | { type: 'breach'; lane: Lane; amount: number }
 
@@ -244,7 +244,7 @@ export class Match {
         this.state.scrap += reward
         report.bounty += reward
         report.kills++
-        effects.push({ type: 'fall', lane: enemy.lane, x: enemy.x, color: definition.color })
+        effects.push({ type: 'fall', id: enemy.id, lane: enemy.lane, x: enemy.x, color: definition.color })
       }
     }
   }
@@ -307,7 +307,7 @@ export class Match {
     applyDamage(unit, damage, definition.armor)
     if (unit.hp === 0) {
       report.losses++
-      effects.push({ type: 'fall', lane: unit.lane, x: unit.x, color: definition.color })
+      effects.push({ type: 'fall', id: unit.id, lane: unit.lane, x: unit.x, color: definition.color })
     }
     return before - unit.hp
   }

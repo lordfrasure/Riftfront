@@ -3,61 +3,101 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#101a20">
   <title>Riftfront · Ages Under Siege</title>
 </head>
 <body>
   <main>
     <header class="masthead">
-      <div><span class="subtitle">Ages Under Siege</span><h1>Riftfront</h1></div>
-      <div class="metrics">
-        <div>Scrap <strong id="scrap"></strong></div>
-        <div>Core <strong id="core"></strong></div>
-        <div>Wave <strong id="wave"></strong></div>
-      </div>
+      <button class="brand" id="home"><span class="sigil" aria-hidden="true">◆</span><span>Riftfront<small>Ages Under Siege</small></span></button>
+      <nav class="actions" aria-label="Main navigation">
+        <button id="open-army">Unit Collection</button>
+        <button id="open-settings">Settings</button>
+        <button id="resume-siege" hidden>Return to siege</button>
+      </nav>
     </header>
-    <div class="commandbar">
-      <strong id="era"></strong>
-      <button id="advance"></button>
-      <div class="actions">
-        <button id="restart">Restart</button>
-        <button id="mute" aria-pressed="false">Sound off</button>
-        <button id="speed" aria-pressed="false">2× speed</button>
-        <button id="pause" aria-pressed="false">Pause</button>
-        <button id="start" class="primary">Start wave</button>
+    <section id="briefing" class="briefing" aria-labelledby="brief-title">
+      <div class="brief-copy">
+        <span class="subtitle">Campaign briefing</span>
+        <h1 id="brief-title">Hold the<br>Ember Gorge</h1>
+        <p>Build a garrison across three lanes, endure ten assaults, and stop the Rift Colossus before it reaches the core.</p>
+        <div class="actions">
+          <button id="play" class="primary">Begin siege <span aria-hidden="true">→</span></button>
+          <button id="review-army">Review defenders</button>
+        </div>
+      </div>
+      <dl class="brief-stats">
+        <div><dt>Starting scrap</dt><dd id="brief-scrap"></dd></div>
+        <div><dt>First assault</dt><dd id="brief-threat"></dd></div>
+        <div><dt>Orders</dt><dd>Plan, then launch each wave</dd></div>
+      </dl>
+    </section>
+
+    <div id="siege" hidden>
+      <div class="commandbar" aria-label="Siege controls">
+        <div class="metrics">
+          <div class="core-stat"><span>Core integrity</span><strong id="core"></strong><progress id="core-meter" aria-label="Core integrity"></progress></div>
+          <div><span>Scrap</span><strong id="scrap"></strong></div>
+          <div><span>Wave</span><strong id="wave"></strong></div>
+          <div><span>Era</span><strong id="era"></strong></div>
+        </div>
+        <div class="actions">
+          <button id="advance"></button>
+          <button id="restart">Restart</button>
+          <button id="mute" aria-pressed="false">Sound off</button>
+          <button id="speed" aria-pressed="false">2× speed</button>
+          <button id="pause" aria-pressed="false">Pause</button>
+          <button id="start" class="primary">Start wave</button>
+        </div>
+      </div>
+
+      <div class="match">
+        <section class="field" aria-label="Three-lane battlefield">
+          <div class="field-legend" aria-hidden="true"><span>◆ Core</span><span>Rifts ◇</span></div>
+          <div id="game" aria-hidden="true"></div>
+          <div id="pads" role="group" aria-label="Formation pads"></div>
+          <div id="paused" class="paused" hidden>Siege paused</div>
+        </section>
+        <aside class="intel" aria-label="Wave intelligence">
+          <div id="inspector" hidden>
+            <img id="unit-portrait" class="portrait" alt="">
+            <div><h2 id="unit-name"></h2><p id="unit-role"></p><ul class="stat-list" id="unit-stats"></ul></div>
+            <div id="retrofits"></div>
+            <div class="actions"><button id="move"></button><button id="retire"></button></div>
+          </div>
+          <section>
+            <span id="intel-heading" class="subtitle"></span>
+            <h2 id="wave-title"></h2>
+            <p id="tip"></p>
+            <ul id="forecast"></ul>
+            <details id="threats"><summary>Enemy abilities</summary><div id="threat-list"></div></details>
+          </section>
+          <section id="report" hidden>
+            <h2 id="report-heading"></h2>
+            <p id="report-damage"></p><p id="report-losses"></p><p id="report-economy"></p>
+          </section>
+        </aside>
+        <section class="workbench" aria-label="Formation orders">
+          <div class="order-heading"><h2>Formation</h2><p id="feedback" role="status"></p></div>
+          <div id="units" role="group" aria-label="Recruit defenders"></div>
+        </section>
       </div>
     </div>
-    <div class="match">
-      <section class="field" aria-label="Three-lane battlefield">
-        <div id="game" aria-hidden="true"></div>
-        <div id="pads" role="group" aria-label="Formation pads"></div>
-        <div id="paused" class="paused" hidden>Paused</div>
-        <div id="result" class="result" hidden>
-          <section><h2 id="outcome"></h2><p id="summary"></p><button id="replay" class="primary">Play again</button></section>
-        </div>
-      </section>
-      <aside class="intel" aria-label="Wave intelligence">
-        <section>
-          <span id="intel-heading" class="subtitle"></span>
-          <h2 id="wave-title"></h2>
-          <p id="tip"></p>
-          <ul id="forecast"></ul>
-          <details id="threats"><summary>Enemy abilities</summary><div id="threat-list"></div></details>
-        </section>
-        <section id="report" hidden>
-          <h2 id="report-heading"></h2>
-          <p id="report-damage"></p><p id="report-losses"></p><p id="report-economy"></p>
-        </section>
-      </aside>
-      <section class="workbench" aria-label="Formation orders">
-        <p id="feedback" role="status"></p>
-        <div id="inspector" hidden>
-          <div><strong id="unit-name"></strong><p id="unit-role"></p></div>
-          <div id="retrofits"></div>
-          <div class="actions"><button id="move"></button><button id="retire"></button></div>
-        </div>
-        <div id="units" role="group" aria-label="Recruit defenders"></div>
-      </section>
-    </div>
+
+    <dialog id="army" aria-labelledby="army-title">
+      <div class="dialog-heading"><h2 id="army-title">Unit Collection</h2><form method="dialog"><button>Close</button></form></div>
+      <div id="collection"></div>
+    </dialog>
+    <dialog id="settings" aria-labelledby="settings-title">
+      <div class="dialog-heading"><h2 id="settings-title">Settings</h2><form method="dialog"><button>Close</button></form></div>
+      <button id="settings-sound" aria-pressed="false">Sound off</button>
+    </dialog>
+    <dialog id="result" aria-labelledby="outcome">
+      <span class="subtitle">Campaign debrief</span>
+      <h2 id="outcome"></h2><p id="summary"></p>
+      <ul id="result-stats" class="stat-list"></ul>
+      <div class="actions"><button id="replay" class="primary">Play again</button><button id="result-home">Main menu</button></div>
+    </dialog>
   </main>
   <script type="module" src="/src/main.ts"></script>
 </body>

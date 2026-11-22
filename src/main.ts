@@ -2,8 +2,10 @@ import * as Phaser from 'phaser'
 import './style.css'
 import { Battlefield } from './battlefield'
 import { BattleSound } from './sound'
+import { buildCollection, listItems, portrait, statItems } from './unit-ui'
+import { fighterImage } from './art/fighters'
 import {
-  CORE_HP, DEFENDERS, ENEMIES, ERAS, HEIGHT, LANES, OVERTIME_TICK, SLOTS, UPGRADES, WAVES, WIDTH, profile,
+  CORE_HP, DEFENDERS, ENEMIES, ERAS, HEIGHT, LANES, OVERTIME_TICK, SLOTS, STARTING_SCRAP, UPGRADES, WAVES, WIDTH, profile,
   type DefenderKind, type EnemyKind, type Lane, type Slot, type UpgradeKind,
 } from './sim/data'
 import { Match, REDEPLOY_COST, type Command } from './sim/match'
@@ -22,23 +24,25 @@ let displayedForecast = 0
 let displayedReport: Match['lastWave']
 const sound = new BattleSound()
 const feedback = element('feedback')
+const inspectorPortrait = element('unit-portrait') as HTMLImageElement
 const start = button('start')
 const pause = button('pause')
 const advance = button('advance')
-const result = element('result')
-const icons: Record<DefenderKind, string> = {
-  guard: '⬟', archer: '➶', scavenger: '✦', lobber: '◉', mender: '✚', conductor: 'ϟ',
-}
+const result = element('result') as HTMLDialogElement
+const army = element('army') as HTMLDialogElement
+const settings = element('settings') as HTMLDialogElement
+const siege = element('siege')
+const briefing = element('briefing')
+let hasSiege = false
+let kills = 0
+let routed = 0
+let completedWaves = 0
 
 const cards = (Object.keys(DEFENDERS) as DefenderKind[]).map(kind => {
   const unit = DEFENDERS[kind]
   const control = document.createElement('button')
   control.className = 'unit'
   control.style.setProperty('--unit-color', color(unit.color))
-  const icon = document.createElement('span')
-  icon.className = 'unit-icon'
-  icon.setAttribute('aria-hidden', 'true')
-  icon.textContent = icons[kind]
   const title = document.createElement('strong')
   title.textContent = unit.label
   const stats = document.createElement('small')
@@ -46,8 +50,12 @@ const cards = (Object.keys(DEFENDERS) as DefenderKind[]).map(kind => {
   const price = document.createElement('span')
   price.className = 'price'
   price.textContent = `${unit.cost} scrap`
-  control.append(icon, title, price, stats)
+  const copy = document.createElement('span')
+  copy.className = 'unit-copy'
+  copy.append(title, price, stats)
+  control.append(portrait(kind), copy)
   control.onclick = () => {
+    feedback.classList.remove('error')
     selected = kind
     inspected = undefined
     moving = false
@@ -68,10 +76,12 @@ const pads = LANES.flatMap((y, row) => SLOTS.map((x, column) => {
   control.onclick = () => {
     const unit = occupant(lane, slot)
     if (unit) {
+      feedback.classList.remove('error')
       inspected = unit.id
       moving = false
       feedback.textContent = `Inspecting ${profile(unit).label} in lane ${lane + 1}.`
       updateHud()
+      element('inspector').scrollIntoView({ block: 'nearest' })
     } else if (moving && inspected !== undefined) {
       issue({ type: 'redeploy', id: inspected, lane, slot }, 'Defender redeployed.')
     } else {
@@ -89,7 +99,9 @@ const upgradeButtons = (Object.keys(UPGRADES) as UpgradeKind[]).map(upgrade => {
   name.textContent = `${definition.label} · ${definition.cost} scrap`
   const details = document.createElement('small')
   details.textContent = definition.role
-  control.append(name, details)
+  const copy = document.createElement('span')
+  copy.append(name, details)
+  control.append(portrait(upgrade), copy)
   control.onclick = () => {
     if (inspected !== undefined) issue({ type: 'upgrade', id: inspected, upgrade }, `${definition.label} retrofit installed.`)
   }
@@ -108,7 +120,14 @@ function issue(command: Command, success: string) {
     if (command.type === 'retire' || command.type === 'start') inspected = undefined
   }
   feedback.textContent = error ?? success
+  feedback.classList.toggle('error', Boolean(error))
   updateHud()
+  if (error || matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  const target = command.type === 'place' || command.type === 'redeploy'
+    ? pads.find(pad => pad.lane === command.lane && pad.slot === command.slot)?.control
+    : command.type === 'upgrade' ? inspectorPortrait : undefined
+  target?.animate([{ boxShadow: '0 0 0 2px #fff1b9' }, { boxShadow: '0 0 0 12px transparent' }],
+    { duration: 370, easing: 'ease-out' })
 }
 
 function updateHud() {
@@ -120,12 +139,18 @@ function updateHud() {
   const shown = WAVES[state.wave - 1]
   element('scrap').textContent = String(state.scrap)
   element('core').textContent = `${state.core} / ${CORE_HP}`
+  const meter = element('core-meter') as HTMLProgressElement
+  meter.max = CORE_HP
+  meter.value = state.core
+  meter.classList.toggle('critical', state.core <= 35)
+  element('units').classList.toggle('standby', !building)
   element('wave').textContent = `${state.wave} / ${WAVES.length}`
   element('era').textContent = ERAS[state.era].label
   document.documentElement.classList.toggle('coil', foundry)
   advance.hidden = foundry || !building
   advance.disabled = state.wave < ERAS.coil.wave || state.scrap < ERAS.coil.cost
-  advance.textContent = state.wave < ERAS.coil.wave ? 'Coil Age unlocks at wave 4' : `Advance to Coil Age · ${ERAS.coil.cost}`
+  advance.hidden ||= state.wave < ERAS.coil.wave
+  advance.textContent = `Advance to Coil Age · ${ERAS.coil.cost}`
   start.disabled = !building
   start.textContent = building ? `Start wave ${state.wave}` : battling ? state.tick >= OVERTIME_TICK ? 'Enemies enraged' : `${state.spawned}/${shown.spawns.length} deployed` : 'Siege ended'
   pause.disabled = !battling
@@ -139,6 +164,7 @@ function updateHud() {
     control.disabled = !building || locked
     control.classList.toggle('unaffordable', state.scrap < DEFENDERS[kind].cost)
     control.title = locked ? 'Available in the Coil Age' : DEFENDERS[kind].role
+    control.classList.toggle('locked', locked)
   }
   const recruit = moving && unit ? profile(unit) : DEFENDERS[selected]
   const reach = (recruit.attack?.range ?? 0) + (recruit.advance ?? 0)
@@ -159,10 +185,10 @@ function updateHud() {
   element('inspector').hidden = !unit
   if (unit) {
     const definition = profile(unit)
-    const { attack, heal, armor } = definition
-    const combat = attack ? ` · ${heal ? `Heals ${heal}` : `${attack.damage} damage`} · ${attack.cooldown / 20}s · ${attack.range} range` : ''
     element('unit-name').textContent = `${definition.label} · Lane ${unit.lane + 1}`
-    element('unit-role').textContent = `${definition.hp} HP${armor ? ` · ${armor} armor` : ''}${combat} · ${definition.role}`
+    element('unit-role').textContent = definition.role
+    inspectorPortrait.src = fighterImage(unit.upgrade ?? unit.kind)
+    element('unit-stats').replaceChildren(...statItems(definition))
     button('move').textContent = moving ? 'Cancel redeploy' : `Redeploy · ${REDEPLOY_COST}`
     button('move').disabled = !moving && state.scrap < REDEPLOY_COST
     button('retire').textContent = `Retire +${Math.floor(DEFENDERS[unit.kind].cost / 3)}`
@@ -173,14 +199,19 @@ function updateHud() {
   }
 
   updateIntel()
-  if ((state.phase === 'victory' || state.phase === 'defeat') && result.hidden) {
+  if ((state.phase === 'victory' || state.phase === 'defeat') && !result.open && !siege.hidden) {
     element('outcome').textContent = state.phase === 'victory' ? 'Rift sealed' : 'Core shattered'
-    const hardest = match.lastWave?.coreDamage.reduce((best, amount, lane, damage) =>
-      amount > damage[best] ? lane : best, 0) ?? 0
+    const damage = match.lastWave?.coreDamage ?? []
+    const mostDamage = Math.max(...damage)
+    const hardest = damage.flatMap((amount, lane) => amount === mostDamage && amount > 0 ? [lane + 1] : [])
     element('summary').textContent = state.phase === 'victory'
       ? `Ten assaults survived · ${state.core} core integrity`
-      : `Wave ${state.wave} · Lane ${hardest + 1} suffered the most damage.`
-    result.hidden = false
+      : `Core lost on wave ${state.wave}.${hardest.length ? ` Heaviest breach: ${hardest.length === 1 ? 'lane' : 'lanes'} ${hardest.join(', ')}.` : ''}`
+    result.dataset.outcome = state.phase
+    element('result-stats').replaceChildren(...listItems([
+      `${completedWaves} waves cleared`, `${kills} enemies defeated`, `${routed} defenders routed`, `${state.scrap} scrap remaining`,
+    ]))
+    result.showModal()
     button('replay').focus()
   }
 }
@@ -220,6 +251,9 @@ function updateIntel() {
   displayedReport = report
   element('report').hidden = !report
   if (!report) return
+  kills += report.kills
+  routed += report.losses
+  if (phase !== 'defeat') completedWaves++
   element('report-heading').textContent = `Wave ${report.wave} report`
   const damage = report.coreDamage.flatMap((amount, lane) => amount ? [`Lane ${lane + 1} −${amount}`] : [])
   element('report-damage').textContent = damage.length ? `Core breached · ${damage.join(' / ')}` : 'Core held in every lane.'
@@ -228,21 +262,24 @@ function updateIntel() {
 }
 
 function reset() {
+  feedback.classList.remove('error')
   match = new Match()
   inspected = undefined
   selected = 'guard'
   moving = false
   paused = false
-  result.hidden = true
+  kills = routed = completedWaves = 0
+  result.close()
   battlefield.resetEffects()
   feedback.textContent = 'Recruit a defender, then choose a pad. The rifts are on the right.'
   updateHud()
-  cards[0].control.focus()
+  if (!siege.hidden) cards[0].control.focus()
 }
 
 start.onclick = () => issue({ type: 'start' }, 'Defenders engage automatically.')
 advance.onclick = () => issue({ type: 'advance', era: 'coil' }, 'Coil Age unlocked. Recruit Coilcasters or inspect a Guard or Archer to retrofit.')
 button('move').onclick = () => {
+  feedback.classList.remove('error')
   moving = !moving
   feedback.textContent = moving ? 'Choose an empty pad in any lane.' : 'Redeploy canceled.'
   updateHud()
@@ -255,15 +292,47 @@ button('speed').onclick = () => {
   button('speed').setAttribute('aria-pressed', String(fast))
 }
 pause.onclick = () => { paused = !paused; updateHud() }
-button('mute').onclick = async () => {
+async function toggleSound() {
   const enabled = await sound.toggle()
-  button('mute').setAttribute('aria-pressed', String(enabled))
-  button('mute').textContent = enabled ? 'Sound on' : 'Sound off'
+  for (const id of ['mute', 'settings-sound']) {
+    const control = button(id)
+    control.setAttribute('aria-pressed', String(enabled))
+    control.textContent = enabled ? 'Sound on' : 'Sound off'
+  }
 }
+button('mute').onclick = toggleSound
+button('settings-sound').onclick = toggleSound
 button('restart').onclick = () => {
   if (match.view.wave === 1 && match.view.phase === 'build' || window.confirm('Restart this siege?')) reset()
 }
+function showSiege() {
+  hasSiege = true
+  siege.hidden = false
+  briefing.hidden = true
+  button('resume-siege').hidden = true
+  updateHud()
+  if (!result.open) (match.view.phase === 'battle' ? pause : cards[0].control).focus()
+}
+function showBriefing() {
+  result.close()
+  siege.hidden = true
+  briefing.hidden = false
+  const active = hasSiege && (match.view.phase === 'build' || match.view.phase === 'battle')
+  button('resume-siege').hidden = !active
+  button('play').focus()
+}
+
+button('home').onclick = showBriefing
+button('play').onclick = () => { reset(); showSiege() }
+button('resume-siege').onclick = showSiege
 button('replay').onclick = reset
+button('result-home').onclick = showBriefing
+result.addEventListener('cancel', event => { event.preventDefault(); showBriefing() })
+button('open-army').onclick = button('review-army').onclick = () => army.showModal()
+button('open-settings').onclick = () => settings.showModal()
+buildCollection(element('collection'))
+element('brief-scrap').textContent = String(STARTING_SCRAP)
+element('brief-threat').textContent = WAVES[0].title
 feedback.textContent = 'Recruit a defender, then choose a pad. The rifts are on the right.'
 updateHud()
 
@@ -271,7 +340,7 @@ const battlefield = new Battlefield(() => match, phase => {
   if (phase === 'build') feedback.textContent = 'Defenders rallied. Review the next threat and reinforce.'
   if (phase === 'victory' || phase === 'defeat') feedback.textContent = 'Siege ended. See the wave report for details.'
   updateHud()
-}, () => paused ? 0 : fast ? 2 : 1, sound)
+}, () => paused || siege.hidden || army.open || settings.open ? 0 : fast ? 2 : 1, sound)
 
 const game = new Phaser.Game({
   type: Phaser.AUTO, parent: 'game', width: WIDTH, height: HEIGHT, backgroundColor: '#171520',
