@@ -15,25 +15,43 @@
         <div>Wave <strong id="wave">1 / 5</strong></div>
       </div>
     </header>
-    <section class="field" aria-label="Three-lane battlefield">
-      <div id="game"></div>
-      <div id="pads" aria-label="Placement pads"></div>
-      <div id="result" class="result" hidden>
-        <section>
-          <h2 id="outcome"></h2>
-          <p id="summary"></p>
-          <button id="replay" class="primary">Play again</button>
-        </section>
-      </div>
+    <section class="orders" aria-label="Defenders">
+      <div id="units"></div>
     </section>
+    <p id="feedback" role="status">Choose a defender and an open pad, then start the wave.</p>
+    <div class="match">
+      <section class="field" aria-label="Three-lane battlefield">
+        <div id="game" aria-hidden="true"></div>
+        <div id="pads" role="group" aria-label="Placement pads"></div>
+        <div id="result" class="result" hidden>
+          <section>
+            <h2 id="outcome"></h2>
+            <p id="summary"></p>
+            <button id="replay" class="primary">Play again</button>
+          </section>
+        </div>
+      </section>
+      <section class="intel" aria-label="Wave information">
+        <div>
+          <h2 id="intel-heading">Incoming wave</h2>
+          <ul id="forecast"></ul>
+          <p id="armor-note" hidden></p>
+        </div>
+        <div id="report" hidden>
+          <h2 id="report-heading">Wave report</h2>
+          <p id="report-economy"></p>
+          <p id="report-losses"></p>
+          <p id="report-damage"></p>
+        </div>
+      </section>
+    </div>
     <section class="orders" aria-label="Orders">
-      <div id="units" aria-label="Defenders"></div>
       <div class="actions">
         <button id="restart">Restart</button>
+        <button id="speed" aria-pressed="false">2× speed</button>
         <button id="start" class="primary">Start wave 1</button>
       </div>
     </section>
-    <p id="feedback" role="status">Select a defender, then choose an open pad.</p>
   </main>
   <script type="module" src="/src/main.ts"></script>
 </body>

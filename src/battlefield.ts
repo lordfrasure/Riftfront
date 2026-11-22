@@ -1,18 +1,17 @@
 import * as Phaser from 'phaser'
-import { CORE_HP, CORE_X, DEFENDERS, ENEMIES, ENTRY_X, HEIGHT, LANES, SLOTS, STEP_MS, WAVES, WIDTH,
-  type EnemyKind } from './sim/data'
+import { CORE_HP, CORE_X, DEFENDERS, ENEMIES, ENTRY_X, HEIGHT, LANES, SLOTS, STEP_MS, WIDTH } from './sim/data'
 import type { Effect, Match, Phase } from './sim/match'
-
-const ENEMY_MARK: Record<EnemyKind, string> = { basic: 'Basic', fast: 'Fast', armored: 'Armored' }
 
 export class Battlefield extends Phaser.Scene {
   private graphics!: Phaser.GameObjects.Graphics
-  private laneLabels: Phaser.GameObjects.Text[] = []
-  private lastForecast = ''
   private accumulator = 0
   private effects: { effect: Effect; age: number }[] = []
 
-  constructor(private readonly match: () => Match, private readonly onChange: (phase: Phase) => void) {
+  constructor(
+    private readonly match: () => Match,
+    private readonly onChange: (phase: Phase) => void,
+    private readonly speed: () => number,
+  ) {
     super('battlefield')
   }
 
@@ -33,14 +32,13 @@ export class Battlefield extends Phaser.Scene {
         terrain.fillStyle(0x22394b).fillRoundedRect(x - 38, y - 39, 76, 78, 5)
       }
       this.add.text(45, y - 48, `LANE ${index + 1}`, { fontSize: '15px', color: '#a4bac9' })
-      this.laneLabels.push(this.add.text(1188, y - 54, '', {
-        fontSize: '16px', color: '#f5c6c1', fontFamily: 'system-ui',
-      }).setOrigin(1, 0))
+      terrain.lineStyle(2, 0x723e68, .8).strokeEllipse(ENTRY_X + 15, y, 55, 112)
+      terrain.lineStyle(3, 0xa95f84, .55).strokeEllipse(ENTRY_X + 15, y, 37, 93)
     }
     this.add.text(46, 660, 'Guard ■     Archer ▲     Scavenger ◆', { fontSize: '17px', color: '#a4bac9' })
     for (const [index, kind] of (['basic', 'fast', 'armored'] as const).entries()) {
       const x = 917 + 114 * index
-      this.add.text(x, 660, ENEMY_MARK[kind], { fontSize: '17px', color: '#' + ENEMIES[kind].color.toString(16) })
+      this.add.text(x, 660, ENEMIES[kind].label, { fontSize: '17px', color: '#' + ENEMIES[kind].color.toString(16) })
     }
     this.graphics = this.add.graphics()
   }
@@ -48,46 +46,32 @@ export class Battlefield extends Phaser.Scene {
   resetEffects() {
     this.accumulator = 0
     this.effects = []
-    this.lastForecast = ''
   }
 
   update(_time: number, delta: number) {
     const match = this.match()
     const previous = match.view.phase
-    const { scrap, core } = match.view
+    const { scrap, core, spawned } = match.view
+    for (const entry of this.effects) entry.age += delta
+    this.effects = this.effects.filter(entry => entry.age < 480)
     if (previous === 'battle') {
-      this.accumulator += Math.min(delta, 250)
+      this.accumulator += Math.min(delta, 250) * this.speed()
       while (this.accumulator >= STEP_MS && match.view.phase === 'battle') {
         this.accumulator -= STEP_MS
         for (const effect of match.tick()) this.effects.push({ effect, age: 0 })
       }
     }
     if (match.view.phase !== 'battle') this.accumulator = 0
-    if (previous !== match.view.phase || scrap !== match.view.scrap || core !== match.view.core) {
+    if (previous !== match.view.phase || scrap !== match.view.scrap || core !== match.view.core ||
+        spawned !== match.view.spawned) {
       this.onChange(match.view.phase)
     }
-    for (const entry of this.effects) entry.age += delta
-    this.effects = this.effects.filter(entry => entry.age < 480)
-    this.renderMatch(match)
+    this.renderMatch(match.view)
   }
 
-  private renderMatch(match: Match) {
-    const state = match.view
+  private renderMatch(state: Match['view']) {
     const g = this.graphics
     g.clear()
-    const forecast = `${state.phase}:${state.wave}`
-    if (forecast !== this.lastForecast) {
-      this.lastForecast = forecast
-      for (const [index, label] of this.laneLabels.entries()) {
-        const counts = new Map<EnemyKind, number>()
-        for (const spawn of WAVES[state.wave - 1]) {
-          if (spawn.lane === index) counts.set(spawn.kind, (counts.get(spawn.kind) ?? 0) + 1)
-        }
-        label.setText(state.phase === 'build'
-          ? [...counts].map(([kind, count]) => `${count} ${ENEMY_MARK[kind]}`).join('  ·  ') || 'No incoming enemies'
-          : '')
-      }
-    }
 
     g.lineStyle(9, 0x487b83).lineBetween(CORE_X - 8, 211, CORE_X - 8, 609)
     for (const y of LANES) {

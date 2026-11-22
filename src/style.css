@@ -1,7 +1,7 @@
 :root {
   color-scheme: dark;
   font-family: system-ui, sans-serif;
-  background: #080e16;
+  background: #0a1019;
   color: #e6eff6;
   --border: #2c4355;
   --muted: #a4bac9;
@@ -9,8 +9,8 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; }
-main { width: min(1170px, calc(100% - 32px)); margin: 20px auto; }
+body { margin: 0; background: radial-gradient(ellipse at 28% 0%, #17283a, transparent 60%); }
+main { width: min(1170px, calc(100% - 32px)); margin: 24px auto; }
 header, .orders, .metrics, .actions, #units {
   display: flex;
   align-items: center;
@@ -30,7 +30,16 @@ h1 span { font-size: .48em; color: var(--muted); letter-spacing: .02em; margin-l
   font-size: .82rem;
 }
 .metrics strong { color: #fff; padding-left: 6px; font-variant-numeric: tabular-nums; }
-.field { position: relative; aspect-ratio: 16 / 9; background: #111d2a; outline: 1px solid var(--border); }
+.match { display: grid; grid-template-columns: minmax(0, 1fr) clamp(220px, 24%, 280px); gap: 14px; align-items: start; }
+.field {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  container-type: inline-size;
+  background: #111d2a;
+  outline: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
 #game, #pads, .result { position: absolute; inset: 0; }
 #game canvas { display: block; width: 100% !important; height: 100% !important; }
 #pads { pointer-events: none; }
@@ -48,25 +57,64 @@ button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 button:disabled { opacity: .5; cursor: default; }
 .pad {
   position: absolute;
-  width: 6%;
-  height: 11%;
+  width: max(6%, 24px);
+  height: max(11%, 24px);
   transform: translate(-50%, -50%);
   background: transparent;
   border: 1px dashed #7a9aab;
   padding: 0;
   pointer-events: auto;
 }
-.pad:hover, .pad:focus-visible { background: #99ffe822; }
+.pad:hover, .pad:focus-visible { background: #99ffe822; border-color: var(--unit-color); z-index: 1; }
+.pad[aria-disabled="true"] { opacity: .55; }
+.pad::after {
+  content: '';
+  position: absolute;
+  width: var(--range);
+  height: 3px;
+  left: 50%;
+  top: 50%;
+  background: var(--unit-color);
+  transform: translateY(-50%);
+  pointer-events: none;
+  visibility: hidden;
+}
+.pad:hover::after, .pad:focus-visible::after { visibility: visible; }
+.pad.occupied { border-color: transparent; }
+.pad.occupied::after { display: none; }
+.pad.occupied:hover { border-color: var(--accent); }
 .pad[hidden] { display: none; }
 .orders { margin-top: 14px; }
-#units { flex-wrap: wrap; }
-.unit { text-align: left; min-width: 126px; }
+#units { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+.unit { text-align: left; min-height: 78px; height: 100%; }
 .unit strong { color: var(--unit-color); }
 .unit small { display: block; margin-top: 3px; color: var(--muted); }
 .unit[aria-pressed="true"] { border-color: var(--unit-color); background: #223243; }
+#speed[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.actions { flex-wrap: wrap; width: 100%; }
+.actions #restart { margin-right: auto; }
 .primary { background: var(--accent); border-color: var(--accent); color: #10261f; font-weight: 750; }
 #feedback { color: var(--muted); margin: 10px 0; min-height: 1.5em; }
+.intel { display: grid; gap: 12px; }
+.intel > div { background: #131e2b; border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; }
+.intel h2 { font-size: 1rem; margin: 0 0 8px; }
+.intel ul { padding: 0; margin: 0; list-style: none; }
+.intel li { display: grid; grid-template-columns: 4.5rem 1fr; gap: 8px; }
+.intel li + li, .intel p { margin: 4px 0 0; }
+.intel li, .intel p { color: var(--muted); font-size: .875rem; }
+.intel strong { color: #e6eff6; }
 .result { display: grid; place-items: center; text-align: center; background: #080e16d9; }
 .result[hidden] { display: none; }
 .result section { background: #132030; border: 1px solid var(--border); padding: 20px 32px; border-radius: 8px; }
 .result h2 { margin: 0; font-size: clamp(1.5rem, 5vw, 3rem); }
+@media (max-width: 800px) {
+  .match { grid-template-columns: 1fr; }
+  .intel { grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); }
+}
+@media (max-width: 560px) {
+  main { width: calc(100% - 20px); margin: 12px auto; }
+  #units { gap: 6px; }
+  .unit { font-size: .82rem; padding: 6px; overflow-wrap: anywhere; }
+  .result section { padding: 8px 12px; }
+  .result p { margin: 6px 0; font-size: .875rem; }
+}

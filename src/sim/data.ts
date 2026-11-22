@@ -40,13 +40,13 @@ export const DEFENDERS: Record<DefenderKind, DefenderDefinition> = {
 }
 
 export const ENEMIES = {
-  basic: { hp: 53, speed: 76, armor: 0, breach: 10, reward: 6, color: 0xff827e,
+  basic: { label: 'Basic', hp: 53, speed: 76, armor: 0, breach: 10, reward: 6, color: 0xff827e,
     attack: { damage: 9, range: 31, cooldown: 18 } },
-  fast: { hp: 34, speed: 113, armor: 0, breach: 8, reward: 5, color: 0xffb268,
+  fast: { label: 'Fast', hp: 34, speed: 113, armor: 0, breach: 8, reward: 5, color: 0xffb268,
     attack: { damage: 6, range: 31, cooldown: 12 } },
-  armored: { hp: 105, speed: 59, armor: 5, breach: 18, reward: 11, color: 0xed8bcb,
+  armored: { label: 'Armored', hp: 105, speed: 59, armor: 5, breach: 18, reward: 11, color: 0xed8bcb,
     attack: { damage: 16, range: 31, cooldown: 23 } },
-} satisfies Record<EnemyKind, { hp: number; speed: number; armor: number; breach: number;
+} satisfies Record<EnemyKind, { label: string; hp: number; speed: number; armor: number; breach: number;
   reward: number; color: number; attack: Attack }>
 
 interface Spawn { lane: Lane; kind: EnemyKind; tick: number }

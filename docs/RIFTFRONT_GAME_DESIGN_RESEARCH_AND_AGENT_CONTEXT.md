@@ -6,6 +6,7 @@
 **Project stage:** HTML5 browser prototype in development, using VS Code and Codex.  
 **Primary audience:** The developer and AI coding/design agents contributing to this project.  
 **Current priority:** Build and balance a genuinely fun **single-player** game before investing in multiplayer.  
+**Implementation reference:** See [current game rules](GAME_DESIGN.md) and the [roadmap](ROADMAP.md).
 **Reference games:** Squadron Tower Defense (StarCraft II Arcade), Age of War, Bloons TD (especially BTD6), Plants vs. Zombies (original), South Park: Let's Go Tower Defense Play!; Legion TD 2 as an important adjacent competitor/reference.
 
 > **Read this first, agents:** This document states the intended direction and hypotheses, not permission to implement everything at once. First inspect the actual repository and existing `AGENTS.md`, `docs/GAME_DESIGN.md`, tests, and current running build. Preserve working code and prior user decisions. Reconcile any differences in a proposed change before editing. The user's highest priority is **fun, balanced single-player gameplay**. Multiplayer is a design constraint for architecture, not a current feature request.
@@ -236,7 +237,7 @@ The goal is high engagement through clarity, mastery, experimentation, and satis
 
 ### 4.1 Phase A: already-requested initial prototype (0.1)
 
-The first coding prompt currently being executed specifies:
+The original prototype brief specified:
 - HTML5, TypeScript, Phaser, Vite.
 - 1280×720 landscape presentation.
 - One battlefield containing **three** horizontal lanes.
@@ -249,7 +250,7 @@ The first coding prompt currently being executed specifies:
 
 **Acceptance:** Launch locally, place defenders, start waves, observe auto-combat, earn/spend resources, and finish or lose a five-wave run. Gameplay should be understandable without reading a manual.
 
-**Do not interrupt the first agent to implement everything in this document.** Let it stabilize the thin slice; audit the actual output before deciding what to extend.
+Use the original brief as a baseline for evaluating the playable slice. Verify the repository and playtest results before extending it.
 
 ### 4.2 Phase B: minimum *fun* single-player game (0.2–0.4)
 
@@ -693,7 +694,7 @@ For an unresolved mechanic, write a hypothesis, set up two conditions, and colle
 - **Engine:** Phaser 4 as selected for browser-first 2D.
 - **Language/build:** TypeScript, Vite, npm.
 - **Editor/agent:** VS Code + Codex CLI/extension.
-- **Testing:** Vitest for core simulation; add browser smoke tests (e.g., Playwright) when automated rendering checks become practical.
+- **Testing:** Node's built-in test runner covers the compiled headless simulation. Use browser smoke tests for rendering and controls.
 - **Version control:** Git, frequent coherent commits.
 - **Deployment:** Static HTML5 build initially; later itch.io/GitHub Pages/own hosting as appropriate.
 
@@ -777,7 +778,9 @@ The architecture should later allow a server to run the simulation and accept pl
 
 ---
 
-## 15. Prioritized implementation backlog with acceptance criteria
+## 15. Original milestone acceptance criteria
+
+For current priorities, use the [roadmap](ROADMAP.md).
 
 ### P0 — Finish and verify prototype 0.1
 
@@ -912,7 +915,7 @@ Sources were checked on **2026-11-22**. The list prioritizes official listings, 
 
 **Operating rule:** Implement one small, testable gameplay improvement at a time. Every feature request should answer: **What new interesting decision does this add? How will we know it is fun and balanced? What could it make worse?**
 
-**Immediate next milestone:** Get a complete playable game running, play it, record frustrations, and prioritize formation clarity/economy tension over quantity of content.
+**Immediate next milestone:** Observe new players through a complete match and use their feedback to refine formation clarity and economy decisions.
 
 ---
 

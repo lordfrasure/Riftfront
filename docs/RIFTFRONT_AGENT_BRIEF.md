@@ -16,12 +16,13 @@ Build a living formation of frontline defenders, ranged attackers, support struc
 4. **Age of War:** Thrilling and obvious advancement across technological eras; avoid simply replacing every old unit with a strictly better one.
 5. **South Park Tower Defense:** Expressive humor, character, optional special actions. Avoid compulsory manual combat and character-swapping in solo play.
 
-## Current prototype baseline (already given to a coding agent)
+## Prototype baseline
 - 1280×720 browser battlefield, **3 horizontal lanes**.
 - Enemies come from right toward a core on left.
 - **3 defenders:** Guard (frontline), Archer (ranged), Scavenger (resource income).
 - **3 enemies:** Basic, Fast, Armored.
 - **5 waves**, build/battle phases, resource and health HUD, win/loss, restart.
+- Lane forecasts, range previews, defender health inspection, and a report after each wave. See [current game rules](GAME_DESIGN.md).
 - Geometric placeholders are fine. Tests, build and runnable browser loop are required.
 
 Do not assume the prototype is complete; inspect files/tests and report what is actually implemented. Do not interrupt or rewrite a working game just to incorporate this brief.
@@ -38,7 +39,7 @@ Do not assume the prototype is complete; inspect files/tests and report what is 
 - **Distinct original IP.** No copied characters, screenshots, sprites, audio, level layouts, UI artwork, text, or source code from the inspiration games.
 
 ## Architecture and quality
-- Keep **deterministic simulation separate from Phaser presentation**; use a fixed timestep, recorded RNG seed, data-driven unit and wave definitions, and commands/events between UI and simulation.
+- Keep **deterministic simulation separate from Phaser presentation**. Use a fixed timestep, data-driven definitions, and commands and events between the UI and simulation. Record a seed if a future mechanic introduces randomness.
 - Support headless simulation for thousands of balance scenarios later.
 - Test wave progression, targeting, damage, resource awards, placement validation, win/loss, restart, and deterministic reproducibility.
 - Add UI information to explain leaks, unit strengths/weaknesses, income, and next wave threats.

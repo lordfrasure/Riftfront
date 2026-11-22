@@ -1,12 +1,21 @@
-import { applyDamage, selectTarget, type Combatant } from './combat'
+import { applyDamage, selectTarget, type Combatant } from './combat.js'
 import {
   CLEAR_BONUS, CORE_HP, CORE_X, DEFENDERS, ENEMIES, ENTRY_X, LANES, SLOTS,
   STARTING_SCRAP, STEP_MS, WAVES,
   type Attack, type DefenderKind, type EnemyKind, type Lane, type Slot,
-} from './data'
+} from './data.js'
 
 export interface Defender extends Combatant { kind: DefenderKind; slot: Slot; incomeTicks: number }
 export interface Enemy extends Combatant { kind: EnemyKind }
+interface WaveReport {
+  wave: number
+  kills: number
+  bounty: number
+  income: number
+  losses: number
+  clearBonus: number
+  coreDamage: [number, number, number]
+}
 export type Phase = 'build' | 'battle' | 'victory' | 'defeat'
 export type Command =
   | { type: 'place'; kind: DefenderKind; lane: Lane; slot: Slot }
@@ -23,6 +32,14 @@ export class Match {
   }
   private waveTick = 0
   private nextId = 1
+  private activeReport?: WaveReport
+  private completedReport?: WaveReport
+
+  get lastWave(): (Readonly<Omit<WaveReport, 'coreDamage'>> & {
+    readonly coreDamage: readonly number[]
+  }) | undefined {
+    return this.completedReport
+  }
 
   get view(): Readonly<Omit<typeof this.state, 'defenders' | 'enemies'>> & {
     readonly defenders: readonly Readonly<Defender>[]
@@ -37,15 +54,20 @@ export class Match {
     if (command.type === 'start') {
       this.waveTick = 0
       state.spawned = 0
+      this.activeReport = {
+        wave: state.wave, kills: 0, bounty: 0, income: 0, losses: 0,
+        clearBonus: 0, coreDamage: [0, 0, 0],
+      }
       for (const defender of state.defenders) defender.cooldown = 0
       state.phase = 'battle'
       return
     }
+    if (command.type !== 'place') return 'Unknown order.'
     const { kind, lane, slot } = command
-    const definition = DEFENDERS[kind]
     if (!Object.hasOwn(DEFENDERS, kind) ||
         !Number.isInteger(lane) || lane < 0 || lane >= LANES.length ||
         !Number.isInteger(slot) || slot < 0 || slot >= SLOTS.length) return 'Invalid placement.'
+    const definition = DEFENDERS[kind]
     if (state.defenders.some(unit => unit.lane === lane && unit.slot === slot)) return 'That pad is occupied.'
     if (state.scrap < definition.cost) return 'You need more scrap.'
     state.scrap -= definition.cost
@@ -56,7 +78,8 @@ export class Match {
   tick(): Effect[] {
     const effects: Effect[] = []
     const state = this.state
-    if (state.phase !== 'battle') return effects
+    const report = this.activeReport
+    if (state.phase !== 'battle' || !report) return effects
     const wave = WAVES[state.wave - 1]
     this.waveTick++
     while (state.spawned < wave.length && wave[state.spawned].tick <= this.waveTick) {
@@ -69,6 +92,7 @@ export class Match {
       if (definition.income && ++defender.incomeTicks === definition.income.interval) {
         defender.incomeTicks = 0
         state.scrap += definition.income.amount
+        report.income += definition.income.amount
         effects.push({ type: 'income', lane: defender.lane, x: defender.x, amount: definition.income.amount })
       }
       if (!definition.attack) continue
@@ -76,7 +100,12 @@ export class Match {
       const target = selectTarget(defender, state.enemies, definition.attack.range, 1)
       if (target && defender.cooldown === 0) {
         this.hit(defender, target, definition.attack, definition.color, effects, ENEMIES[target.kind].armor)
-        if (target.hp === 0) state.scrap += ENEMIES[target.kind].reward
+        if (target.hp === 0) {
+          const reward = ENEMIES[target.kind].reward
+          state.scrap += reward
+          report.bounty += reward
+          report.kills++
+        }
       }
     }
 
@@ -87,15 +116,19 @@ export class Match {
       const distance = definition.speed * STEP_MS / 1000
       const target = selectTarget(enemy, state.defenders, definition.attack.range + distance, -1)
       if (target) {
-        enemy.x = Math.max(enemy.x - distance, target.x + definition.attack.range)
-        if (enemy.cooldown === 0 && enemy.x - target.x <= definition.attack.range) {
+        enemy.x = target.x + definition.attack.range
+        if (enemy.cooldown === 0) {
           this.hit(enemy, target, definition.attack, definition.color, effects)
+          if (target.hp === 0) report.losses++
         }
       } else {
         enemy.x -= distance
         if (enemy.x <= CORE_X) {
-          state.core = Math.max(0, state.core - definition.breach)
-          effects.push({ type: 'breach', lane: enemy.lane, amount: definition.breach })
+          const damage = Math.min(state.core, definition.breach)
+          state.core -= damage
+          report.coreDamage[enemy.lane] += damage
+          effects.push({ type: 'breach', lane: enemy.lane, amount: damage })
+          if (state.core === 0) break
         }
       }
     }
@@ -107,9 +140,14 @@ export class Match {
       if (state.wave === WAVES.length) state.phase = 'victory'
       else {
         state.scrap += CLEAR_BONUS
+        report.clearBonus = CLEAR_BONUS
         state.wave++
         state.phase = 'build'
       }
+    }
+    if (state.phase !== 'battle') {
+      this.completedReport = report
+      this.activeReport = undefined
     }
     return effects
   }

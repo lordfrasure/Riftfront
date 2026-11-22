@@ -1,4 +1,4 @@
-import type { Lane } from './data'
+import type { Lane } from './data.js'
 
 export interface Combatant {
   id: number
