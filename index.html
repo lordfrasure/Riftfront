@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Riftfront: Ages Under Siege</title>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Riftfront <span>Ages Under Siege</span></h1>
+      <div class="metrics">
+        <div>Scrap <strong id="scrap">110</strong></div>
+        <div>Core <strong id="core">100 / 100</strong></div>
+        <div>Wave <strong id="wave">1 / 5</strong></div>
+      </div>
+    </header>
+    <section class="field" aria-label="Three-lane battlefield">
+      <div id="game"></div>
+      <div id="pads" aria-label="Placement pads"></div>
+      <div id="result" class="result" hidden>
+        <section>
+          <h2 id="outcome"></h2>
+          <p id="summary"></p>
+          <button id="replay" class="primary">Play again</button>
+        </section>
+      </div>
+    </section>
+    <section class="orders" aria-label="Orders">
+      <div id="units" aria-label="Defenders"></div>
+      <div class="actions">
+        <button id="restart">Restart</button>
+        <button id="start" class="primary">Start wave 1</button>
+      </div>
+    </section>
+    <p id="feedback" role="status">Select a defender, then choose an open pad.</p>
+  </main>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
