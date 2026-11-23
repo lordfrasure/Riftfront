@@ -24,4 +24,8 @@ Human feedback is an approval gate for every major gameplay milestone. Run the c
 
 ## Sessions
 
-The strategic redesign specification records the owner's first-attempt clear with little strategic effort. This assignment adds the protocol and baseline tooling. A structured human session and approval for the next gameplay experiment are pending.
+The strategic redesign specification records the owner's first-attempt clear with little strategic effort. The baseline tooling adds a paired comparison for the opening.
+
+### Early economy pressure
+
+Pending human session. Use control `cb49d71` and candidate `3b4dec5` with their fixed encounters. Record unaided lane forecasts, opening purchases and placements, explanations of any breaches, recovery purchases for waves 2 and 3, and the opening the player would try next. See the [paired comparison and playtest questions](BALANCE_REPORT.md#findings-and-playtest-gate).

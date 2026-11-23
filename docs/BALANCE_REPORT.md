@@ -68,10 +68,79 @@ Fixed columns show one run per policy. The final two columns summarize the match
 
 The owner reported a first-attempt clear with little strategic effort in the strategic redesign specification. The existing UI exposes per-lane forecasts, specific unit hints, range previews, contextual upgrades and fusion previews, and wave reports. Wave 1 explicitly suggests forward Guards. The debrief counts routes and breaches but does not attribute them to an enemy or show which investment was displaced. The combined evidence motivates testing whether players can anticipate and explain a real trade-off. Readability, tension, intentional replay and the balance of unfamiliar strategies are pending structured playtests. The timing sweep preserves the campaign's threats and does not test new encounter families.
 
-## Next experiment for approval
+## Early economy pressure experiment
 
 **Test a forecasted wave 1 pack using the existing Raider budget.** On an isolated branch, compress the arrival times of the five Raiders in lane 1 into a clearly forecasted pack. Keep enemy counts, types, lane assignment, rewards, starting scrap, unit stats, and later waves fixed. Explain the concentrated threat in the forecast and let players pick their response.
 
 The hypothesis is that overlapping attacks expose an unsupported interceptor, making immediate ranged or frontline reinforcement compete with early salvage. The fixed baseline shows the opening is where the first economy decision is currently free in combat terms. Changing arrival timing first isolates pressure without removing the payout or making subsequent defense broadly more expensive. It could instead create an obligatory Lobber, simply shift the safe formation forward, or impose a confusing opening tax. Timing alone may fail to create enough pressure.
 
 Compare matched baseline and candidate runs for Guard-only, single salvage, Archer or Lobber reinforcement in the threatened lane, a second interceptor, and maximum greed. Test early placement alternatives and reuse the same timing seeds. Inspect overlap, first-wave routes and lane damage, delayed salvage, opening spend, and core and bank through wave 3 to test recovery. Keep the change if the early investment risks an attributable breach or materially worse recovery position, at least two affordable responses address the threat, and greed remains viable through deliberate placement or later investment. Human players should recognize the pressure from the forecast, explain the trade they made, and have a concrete alternative they want to try. Revise or reject if the encounter has one obvious purchase, relies on unexplained leaks, or turns a single early mistake into sustained failure. Approval and a human session precede acceptance.
+
+### Experiment record
+
+Control commit `cb49d71dab9ff17cdfaa5a9dcd5644cdeab26fe8` on main. This retains the shipped encounter and adds the laboratory used for the comparison.
+
+The candidate compresses lane 1 arrivals from 19 ticks apart to 4 ticks apart. Compare wave 1 clears, core damage by lane, route counts, time to lose the last lane 1 interceptor, opening spend, and salvage. Track core and bank through waves 2 and 3, then campaign clears and final resources. Use one shared adaptive purchasing policy after the opening, with fixed timing and five shared timing-perturbation seeds. A successful test should expose a downside to early salvage, show at least two affordable defensive answers, and leave a credible recovery after a weak opening. Check whether backline safety, formation spacing, or the following wave's budget explains the results.
+
+The tested candidate is `3b4dec5e050772ea64fa7d25725f769ec9572a28`. Lane 1's five Raiders enter over 0.8 seconds instead of 3.8 seconds. Lane 2's three arrivals stay staggered. The forecast identifies both patterns. Enemy counts and stats, starting scrap, prices, clear grants, bounty rates, and later waves are unchanged.
+
+### Reproduce the paired comparison
+
+Run from the repository with dependencies installed. The control worktree receives only the candidate lab instrumentation and opening fixture. Its simulator and campaign data come from the baseline commit.
+
+```sh
+baseline=cb49d71dab9ff17cdfaa5a9dcd5644cdeab26fe8
+candidate=3b4dec5e050772ea64fa7d25725f769ec9572a28
+comparison_dir=$(mktemp -d)
+git worktree add --detach "$comparison_dir/control" "$baseline"
+git worktree add --detach "$comparison_dir/candidate" "$candidate"
+mkdir -p "$comparison_dir/control/tests/fixtures"
+cp "$comparison_dir/candidate/tests/balance-lab.mjs" "$comparison_dir/control/tests/"
+for build in control candidate; do
+  (
+    cd "$comparison_dir/$build"
+    npm ci
+    npm run --silent balance -- --lab --config "$comparison_dir/candidate/tests/fixtures/early-economy-pressure.json" --json > "$comparison_dir/$build-fixed.json"
+    npm run --silent balance -- --lab --config "$comparison_dir/candidate/tests/fixtures/early-economy-pressure.json" --seeds 11,29,47,83,101 --jitter 8 --json > "$comparison_dir/$build-seeded.json"
+  )
+done
+```
+
+Every opening uses the same adaptive rule from wave 2 onward, with Bastion, Longshot, and Mender preferences. Actual purchases vary with the bank and occupied pads. For example, moving the lane 1 Guard back a pad leaves the planner's usual forward pad free, so it buys another lane 1 Guard in wave 2. Moving salvage into lane 2 can occupy a slot used by a late purchase. Campaign comparisons include those downstream effects. The maximum-greed opening pairs one Guard with a cheaper Chassis to afford two Scavengers. Each seed applies the same jitter sequence in chronological spawn order. Compression reorders some lane 1 arrivals relative to lane 2 in wave 1, so some individual Raiders receive different offsets. Later waves receive identical schedules across the two builds.
+
+### Fixed encounter
+
+Each arrow gives control → candidate. All openings cleared waves 1–3. Collapse means the last interceptor in that lane routed, measured from wave launch. The wave 1 core damage occurred entirely in lane 1 except for maximum greed, which lost 16 core in lane 2 in both builds. End banks include wave payouts.
+
+| Opening | Wave 1 spend | Wave 1 core lost | Wave 1 routes | Lane 1 collapse | Wave 1 salvage | Wave 1 end bank |
+| --- | ---: | ---: | ---: | --- | ---: | ---: |
+| Two Guards | 68 | 0 → 24 | 0 → 1 | — → 5.65 s | 0 | 151 → 139 |
+| Two Guards + lane 1 Scavenger | 100 | 0 → 24 | 0 → 2 | — → 5.65 s | 11 → 0 | 130 → 107 |
+| Two Guards + lane 1 Archer | 108 | 0 | 0 | — | 0 | 111 |
+| Two Guards + lane 1 Lobber | 118 | 0 | 0 | — | 0 | 101 |
+| Two Guards + second lane 1 Guard | 102 | 0 | 0 → 1 | — | 0 | 117 |
+| Two Guards + lane 2 Scavenger | 100 | 0 → 24 | 0 → 1 | — → 5.65 s | 11 | 130 → 118 |
+| Lane 1 Guard one pad back + lane 1 Scavenger | 100 | 0 → 24 | 0 → 2 | — → 6.50 s | 11 → 0 | 130 → 107 |
+| Maximum greed | 128 | 16 → 40 | 2 → 4 | — → 5.65 s | 11 → 0 | 94 → 71 |
+
+| Opening | Wave 2 end core / bank | Wave 3 end core / bank | Campaign clears / core | Campaign salvage / end bank | Seeded wins / mean final core |
+| --- | --- | --- | --- | --- | --- |
+| Two Guards | 100 / 118 → 76 / 106 | 100 / 177 → 76 / 165 | 10 / 100 → 10 / 76 | 0 / 113 → 0 / 101 | 5/5 · 100 → 5/5 · 76 |
+| Lane 1 Scavenger | 100 / 118 → 76 / 135 | 100 / 188 → 76 / 165 | 10 / 100 → 10 / 76 | 110 / 241 → 99 / 218 | 5/5 · 100 → 5/5 · 76 |
+| Archer | 100 / 128 | 100 / 187 | 10 / 100 | 0 / 124 | 5/5 · 100 |
+| Lobber | 100 / 118 | 100 / 177 | 10 / 100 | 0 / 113 | 5/5 · 100 |
+| Second lane 1 Guard | 100 / 134 | 83 / 185 | 10 / 3 | 0 / 89 | 5/5 · 9 |
+| Lane 2 Scavenger | 100 / 118 → 76 / 146 | 100 / 188 → 76 / 176 | 10 / 100 → 10 / 76 | 99 / 153 → 99 / 141 | 5/5 · 100 → 5/5 · 76 |
+| Rearward lane 1 Guard | 100 / 124 → 64 / 145 | 100 / 154 → 64 / 125 | 10 / 100 → 10 / 64 | 110 / 246 → 99 / 217 | 5/5 · 100 → 5/5 · 65.2 |
+| Maximum greed | 60 / 110 → 24 / 131 | 60 / 151 → 24 / 122 | 8 / 0 → 6 / 0 | 143 / 203 → 88 / 54 | 0/5 · 0 |
+
+Wave 1 core damage and route counts matched the fixed run in all five seeds for each build and opening. In the candidate, the forward unsupported Guard routed in 5.30–5.80 seconds. Moving it one pad back delayed the collapse to 6.15–6.65 seconds, with the same three Raider breaches. In the fixed run, all wave 2 and 3 route counts were zero except for the second Guard opening (two in wave 3 in both builds), rearward Guard (one in candidate wave 2), and maximum greed (control 2 and 1, candidate 3 and 1).
+
+### Findings and playtest gate
+
+- **There is a priced trade-off.** The unsupported lane 1 Guard routed and three Raiders leaked, costing 24 core and 12 bounty. A Scavenger in that lane also routed, losing its 11-scrap payout. Moving salvage to lane 2 earned 33 scrap by wave 3 on a 32-scrap recruit and finished every tested candidate run at 76 core. Keeping scrap unspent also recovered, with the shared planner covering all lanes and buying both Lobbers in wave 2.
+- **Archer is the strongest tested damage-prevention buy.** Both ranged reinforcements kept perfect core for all tested schedules. Fixed clears took 6.60 seconds for both. Archer cost 10 less and ended with 11 more scrap. The extra Guard cost 6 less than Archer and also prevented wave 1 breaches, with one route and much worse later results under the common planner in both builds. The evidence gives distinct choices between spending for core security and keeping flexibility or investing for returns, with limited differentiation among the immediate combat purchases.
+- **Recovery depends on the opening.** The two-Guard and both forward single-Scavenger plans held waves 2 and 3 after the wave 1 breach. Moving the Guard back one pad changed adaptive spending and led to a wave 2 leak. Maximum greed reached wave 3 at 24 core and lost on wave 7 in the fixed candidate. This was a high-risk package in the control as well. The tests do not establish how readily a first-time player can identify and buy the recovery units.
+- **Verification.** All 21 tests passed. The production build passed with Vite's chunk-size warning. Chromium verified the forecast, placements, launch controls, and wave report on desktop at 1440 × 900 and touch at 390 × 844. The desktop lane 1 Scavenger run lost 24 core and routed two units. The touch Lobber run held every lane with zero routes.
+
+Ask players before launching which lane is most likely to break, whether they would invest in salvage, where they would place it, and what they would give up to reinforce. After combat, ask them to explain the breach or clean hold using the wave report and state what they would buy before wave 2. On replay, observe whether Archer, Lobber, a second Guard, banking, and safer salvage have credible use cases or whether the player always picks Archer. Record whether a 24-core loss felt predictable and whether the player could recover without coaching. Decision pending human playtest and project-owner approval.

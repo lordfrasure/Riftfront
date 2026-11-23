@@ -19,8 +19,8 @@ The current campaign has ten waves, three lanes with seven pads, eight recruits,
 
 ## Sequence
 
-1. Establish the laboratory and measure the current game. This report and tooling complete the infrastructure assignment. The next experiment awaits approval.
-2. Test one early encounter that creates an economy trade-off. Follow the proposal in the [balance report](BALANCE_REPORT.md).
+1. Establish the laboratory and measure the current game. The report and tooling complete the infrastructure assignment.
+2. Test one early encounter that creates an economy trade-off. The [paired balance comparison](BALANCE_REPORT.md#early-economy-pressure-experiment) and browser checks are complete on `experiment/early-economy-pressure`. The candidate awaits human playtest and project-owner decision.
 3. Use the result and player feedback to choose the next strategic question. Capacity, recovery, and encounter counterplay remain candidates. Expanded builders, loadouts, progression, and content depend on a playable strategic foundation.
 
 ## Historical delivery notes

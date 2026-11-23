@@ -69,7 +69,7 @@ During planning, place the unupgraded inputs on consecutive pads in one lane. In
 | Herald | Gives nearby allies 5 armor. The aura is visible around it. Longshot or armor exposure can keep its escorts from stalling a lane. |
 | Rift Colossus | The final center-lane boss. Marks a circular area before a crushing blast. Spread support behind the line and reserve a way through its plate. An unblocked Colossus destroys the core. |
 
-The opening introduces coverage and clustered rushes, then single armored threats and ranged fire. Protected armor, sustained ranged waves, and a heavily contested center follow. The final assault sends the Colossus through the center while the outer lanes face separate attacks.
+The first assault sends five Raiders in a tight pack down lane 1 and three staggered Raiders down lane 2. Wave 2 introduces clustered Skitter rushes, followed by single armored threats and ranged fire. Protected armor, sustained ranged waves, and a heavily contested center follow. The final assault sends the Colossus through the center while the outer lanes face separate attacks.
 
 ## Implementation and verification
 
