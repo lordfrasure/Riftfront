@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
 import { Match } from '../.test-build/match.js'
-import { LAYOUTS, OVERTIME_TICK, STEP_MS } from '../.test-build/data.js'
+import { LAYOUTS, OVERTIME_TICK, STEP_MS, profile } from '../.test-build/data.js'
 import { plan, resolve, strategies } from './balance.mjs'
 
 const guards = strategies.economy.opening.slice(0, 2)
@@ -71,15 +71,25 @@ function trial(strategy, layout, schedule) {
     const creatures = match.waves[wave - 1].spawns
     const formation = match.view.defenders.map(({ id, kind, lane, slot, upgrade }) => ({ id, kind, lane, slot, upgrade }))
     const byId = new Map(formation.map(unit => [unit.id, unit]))
+    const interceptors = layout.lanes.map((_, lane) => new Set(
+      formation.filter(unit => unit.lane === lane && profile(unit).advance).map(unit => unit.id),
+    ))
+    const frontlineCollapseTicks = layout.lanes.map(() => null)
     const routedByKind = {}
     const damageTakenByKind = {}
     let activeTicks = 0
+    let ticks = 0
     const report = resolve(match, effects => {
+      ticks++
       if (effects.some(effect => effect.type === 'hit' || effect.type === 'blast' || effect.type === 'breach')) activeTicks++
       for (const effect of effects) {
         if (effect.type === 'fall') {
           const unit = byId.get(effect.id)
-          if (unit) routedByKind[unit.kind] = (routedByKind[unit.kind] ?? 0) + 1
+          if (unit) {
+            routedByKind[unit.kind] = (routedByKind[unit.kind] ?? 0) + 1
+            const line = interceptors[unit.lane]
+            if (line.delete(unit.id) && line.size === 0) frontlineCollapseTicks[unit.lane] = ticks
+          }
         }
         if (effect.type === 'hit' && effect.style !== 'heal') {
           const unit = byId.get(effect.target)
@@ -91,7 +101,7 @@ function trial(strategy, layout, schedule) {
     waves.push({ ...report, openingScrap, spent, refunds, bankAtStart: openingScrap - spent + refunds,
       core: match.view.core, scrap: match.view.scrap, scheduled: creatures.length,
       cleared: match.view.phase !== 'defeat', activeTicks, routedByKind, directHitDamageTaken: damageTakenByKind,
-      formation, orders })
+      formation, orders, frontlineCollapseTicks })
   }
   const spending = sum(waves.map(wave => wave.spent))
   const damage = sum(waves.flatMap(wave => Object.values(wave.damage)))

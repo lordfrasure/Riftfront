@@ -170,8 +170,8 @@ function wave(title: string, tip: string, grant: number, bountyRate: number, ...
 }
 
 export const WAVES = [
-  wave('First Contact', 'Start with Guards on the forward pads in lanes 1 and 2. Decide where to invest the rest.', 59, 1,
-    [0,'raider',5,1,19], [1,'raider',3,10,24]),
+  wave('First Contact', 'Five Raiders hit lane 1 in a tight pack. Lane 2 faces three staggered Raiders. Consider backing up the lane 1 Guard.', 59, 1,
+    [0,'raider',5,1,4], [1,'raider',3,10,24]),
   wave('The Scramble', 'Lane 3 opens. A Lobber can hit an entire Skitter pack at once.', 56, 1,
     [2,'skitter',6,1,5], [0,'raider',3,9,19], [1,'skitter',5,40,7]),
   wave('Battering Line', 'Keep fragile units behind the first pad an Iron Ram reaches.', 41, 1,

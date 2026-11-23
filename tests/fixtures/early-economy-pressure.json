@@ -1,0 +1,26 @@
+{
+  "guards": { "preset": "guardOnlyOpening" },
+  "salvage": { "preset": "economy" },
+  "archer": {
+    "preset": "guardOnlyOpening",
+    "opening": [["guard", 0, 3], ["guard", 1, 3], ["archer", 0, 2]]
+  },
+  "lobber": {
+    "preset": "guardOnlyOpening",
+    "opening": [["guard", 0, 3], ["guard", 1, 3], ["lobber", 0, 2]]
+  },
+  "secondGuard": {
+    "preset": "guardOnlyOpening",
+    "opening": [["guard", 0, 3], ["guard", 1, 3], ["guard", 0, 2]]
+  },
+  "saferSalvage": {
+    "preset": "economy",
+    "opening": [["guard", 0, 3], ["guard", 1, 3], ["scavenger", 1, 0]]
+  },
+  "rearGuardSalvage": {
+    "preset": "economy",
+    "opening": [["guard", 1, 3], ["scavenger", 0, 0]],
+    "orders": { "1": [{ "type": "place", "kind": "guard", "lane": 0, "slot": 5 }] }
+  },
+  "maxGreed": { "preset": "doubleSalvage" }
+}

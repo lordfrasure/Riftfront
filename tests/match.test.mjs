@@ -25,6 +25,27 @@ function finish(match, onTick = () => {}) {
   return effects
 }
 
+function matchWithStaggeredOpening() {
+  const [first, ...later] = WAVES
+  let raiders = 0
+  const spawns = first.spawns.map(spawn => spawn.lane === 0
+    ? { ...spawn, tick: 1 + raiders++ * 19 }
+    : spawn).sort((a, b) => a.tick - b.tick)
+  return new Match(LAYOUTS.seven, [{ ...first, spawns }, ...later])
+}
+
+it('forecasts and delivers the lane 1 pack while preserving the staggered lane 2 arrivals', () => {
+  const match = new Match()
+  assert.match(match.waves[0].tip, /lane 1 in a tight pack/)
+  assert.deepEqual(match.waves[0].spawns.filter(spawn => spawn.lane === 0).map(spawn => spawn.tick), [1, 5, 9, 13, 17])
+  assert.deepEqual(match.waves[0].spawns.filter(spawn => spawn.lane === 1).map(spawn => spawn.tick), [10, 34, 58])
+  plan(match, strategies.economy)
+  finish(match)
+  assert.deepEqual(match.lastWave.coreDamage, [24, 0, 0])
+  assert.equal(match.lastWave.income, 0)
+  assert.equal(match.view.phase, 'build')
+})
+
 describe('combat', () => {
   it('selects the nearest live target ahead in its lane and breaks ties by ID', () => {
     const attacker = { id: 1, lane: 0, x: 100, hp: 10, cooldown: 0 }
@@ -148,7 +169,7 @@ describe('planning and progression', () => {
       assert.equal(result.phase, 'victory')
       assert.equal(result.waves.length, WAVES.length)
     }
-    assert.ok(economy.waves[0].income > 0)
+    assert.ok(economy.waves[1].income > 0)
     assert.equal(artillery.waves[0].income, 0)
     assert.deepEqual(run(strategies.economy), economy)
     assert.ok(artillery.formation.some(unit => unit.upgrade === 'vanguard'))
@@ -186,7 +207,7 @@ describe('planning and progression', () => {
   })
 
   it('resolves a healing stalemate once enemy overtime damage ramps', () => {
-    const match = new Match()
+    const match = matchWithStaggeredOpening()
     const strategy = { ...strategies.economy, exclude: 'archer' }
     while (match.view.phase === 'build' && match.view.wave <= 4) {
       plan(match, strategy)
@@ -346,7 +367,7 @@ describe('expanded formations', () => {
   })
 
   it('uses the base Saboteur to prioritize a Herald behind other enemies', () => {
-    const match = new Match()
+    const match = matchWithStaggeredOpening()
     let prioritized = false
     while (match.view.phase === 'build' && !prioritized) {
       plan(match, { ...strategies.disruption, disrupt: false })
@@ -370,7 +391,7 @@ describe('expanded formations', () => {
         (view, effect) => effect.style === 'shell' &&
           view.enemies.some(enemy => enemy.id === effect.target && enemy.kind === 'herald' && enemy.disrupted > 0)],
     ]) {
-      const match = new Match()
+      const match = matchWithStaggeredOpening()
       let used = false
       while (match.view.phase === 'build' && !used) {
         plan(match, strategy)
