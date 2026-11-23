@@ -7,7 +7,7 @@ Ember Gorge uses warm bronze hardware and amber signals around the core, with mu
 | Source | Contents | Consumers |
 | --- | --- | --- |
 | `src/art/ember-gorge.webp` | 1600 × 820 environment plate | Briefing background and Phaser arena |
-| `src/art/fighters.ts` | Typed artwork for all six defenders, six enemies, and four retrofits | Phaser textures, formation cards, inspector and collection |
+| `src/art/fighters.ts` | Typed artwork for eight recruits, two composites, six enemies, and ten evolutions | Phaser textures, formation cards, inspector and collection |
 | `src/art/actor.ts` | Layer transforms for idle, movement, attack, hit, boss windup and fall | Phaser battlefield |
 | `src/field-art.ts` | Lane surfaces, pads, core foundations, portal pylons and era colors | Phaser static graphics layer |
 

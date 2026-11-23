@@ -1,12 +1,12 @@
 import type { GameObjects } from 'phaser'
-import { CORE_X, ENTRY_X, HEIGHT, LANES, SLOTS, WIDTH } from './sim/data'
+import { CORE_X, ENTRY_X, HEIGHT, WIDTH, type Layout } from './sim/data'
 
-export function drawArena(g: GameObjects.Graphics, coil: boolean) {
+export function drawArena(g: GameObjects.Graphics, coil: boolean, { lanes, slots }: Layout) {
   const metal = coil ? 0x6778a3 : 0x807563
   const light = coil ? 0x9facff : 0xf0c17f
   g.fillStyle(0x0b171d, .33).fillRect(0, 0, WIDTH, HEIGHT)
   g.fillStyle(0x071215, .52).fillRect(0, 0, WIDTH, 73).fillRect(0, HEIGHT - 46, WIDTH, 46)
-  for (const [index, y] of LANES.entries()) {
+  for (const [index, y] of lanes.entries()) {
     const deck = coil ? 0x293443 : 0x333330
     g.fillStyle(0x0c171d, .94).fillRoundedRect(38, y - 43, 1208, 105, 6)
     g.fillStyle(deck, .94).fillRoundedRect(39, y - 46, 1205, 91, 5)
@@ -19,10 +19,10 @@ export function drawArena(g: GameObjects.Graphics, coil: boolean) {
       g.lineStyle(1, 0xd4ccb9, .13).lineBetween(x + 15, y - 42, x, y + 42)
       g.fillStyle(metal, .46).fillCircle(x, y + 43, 2).fillCircle(x + 15, y - 42, 2)
     }
-    for (const x of SLOTS) {
-      g.fillStyle(0x0d2026, .88).fillEllipse(x, y + 13, 115, 46)
-      g.lineStyle(2, metal, .9).strokeEllipse(x, y + 11, 111, 42)
-      g.lineStyle(1, light, .49).strokeEllipse(x, y + 11, 96, 34)
+    for (const x of slots) {
+      g.fillStyle(0x0d2026, .88).fillEllipse(x, y + 13, 95, 46)
+      g.lineStyle(2, metal, .9).strokeEllipse(x, y + 11, 91, 42)
+      g.lineStyle(1, light, .49).strokeEllipse(x, y + 11, 79, 34)
       g.fillStyle(light, .76).fillTriangle(x - 5, y + 31, x + 5, y + 31, x, y + 37)
     }
     g.fillStyle(0x172b31).fillEllipse(CORE_X, y + 12, 92, 56)

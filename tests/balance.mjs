@@ -1,47 +1,79 @@
 import { pathToFileURL } from 'node:url'
 import { Match } from '../.test-build/match.js'
-import { DEFENDERS, STEP_MS, WAVES } from '../.test-build/data.js'
+import { DEFENDERS, LAYOUTS, STEP_MS } from '../.test-build/data.js'
 
 export const strategies = {
   economy: { opening: [['guard',0,3], ['guard',1,3], ['scavenger',0,0]], guard: 'bastion', archer: 'longshot', support: 'mender' },
   defense: { opening: [['guard',0,3], ['guard',1,3], ['lobber',0,2]], guard: 'vanguard', archer: 'volley', support: 'conductor' },
   balanced: { opening: [['guard',0,3], ['guard',1,3], ['archer',1,2]], guard: 'bastion', archer: 'volley', support: 'conductor' },
   artillery: { opening: [['guard',0,3], ['guard',1,3], ['lobber',1,2]], guard: 'vanguard', archer: 'longshot', support: 'mender', splash: true },
+  evolution: { opening: [['guard',0,3], ['guard',1,3], ['archer',1,2]], guard: 'bastion', archer: 'longshot', support: 'mender', construct: 'relay' },
+  fusion: { opening: [['guard',0,3], ['guard',1,3], ['mender',1,2]], guard: 'bastion', archer: 'longshot', support: 'mender', fusion: true },
+  disruption: { opening: [['guard',0,3], ['guard',1,3], ['saboteur',1,2]], guard: 'bastion', archer: 'longshot', support: 'mender', disrupt: true },
   empty: { opening: [] },
 }
 
 export function plan(match, strategy) {
-  const place = (kind, lane, slot) => {
+  const { layout } = match
+  const columns = layout.slots.length === 7 ? [0, 2, 4, 6] : [0, 2, 3, 5]
+  const put = (kind, lane, slot) => {
     if (kind === strategy.exclude) return
     return match.dispatch({ type: 'place', kind, lane, slot })
+  }
+  const place = (kind, lane, slot) => {
+    return put(kind, lane, columns[slot])
   }
   const { wave } = match.view
   if (wave === 1) {
     for (const order of strategy.opening) {
-      const error = place(...order)
+      const [kind, lane, slot] = order
+      const error = strategy.fusion && kind === 'mender' ? put(kind, lane, columns[3] - 1) : place(...order)
       if (error) throw Error(error)
     }
     return
   }
   if (!strategy.guard) return
-  const unitAt = (lane, slot) => match.view.defenders.find(unit => unit.lane === lane && unit.slot === slot)
+  const unitAt = (lane, slot) => match.view.defenders.find(unit => unit.lane === lane && unit.slot === columns[slot])
   const upgrade = (lane, slot, branch) => {
     const unit = unitAt(lane, slot)
     if (unit && !unit.upgrade) match.dispatch({ type: 'upgrade', id: unit.id, upgrade: branch })
   }
   const lanes = wave === 10 ? [1, 0, 2] : wave <= 2 || wave === 5 ? [2, 1, 0] : [0, 2, 1]
+  if (layout.lanes.length === 4) lanes.push(3)
+  if (strategy.fusion) {
+    const fuse = (first, second) => {
+      if (first && second) match.dispatch({ type: 'fuse', first: first.id, second: second.id })
+    }
+    const front = unitAt(1, 3)
+    const healer = match.view.defenders.find(unit => unit.lane === 1 && unit.kind === 'mender' && unit.slot === columns[3] - 1)
+    fuse(front, healer)
+    if (wave >= 6 && !match.view.defenders.some(unit => unit.kind === 'arcRanger')) {
+      const archer = unitAt(1, 2)
+      if (archer?.kind === 'archer' && !archer.upgrade) {
+        put('conductor', 1, columns[2] - 1)
+        fuse(archer, match.view.defenders.find(unit => unit.kind === 'conductor' && unit.lane === 1 && unit.slot === columns[2] - 1))
+      }
+    }
+  }
+  if (strategy.construct && strategy.construct !== 'relay') {
+    if (wave >= 4) match.dispatch({ type: 'advance', era: 'coil' })
+    upgrade(0, strategy.construct === 'bulwark' ? 3 : 2, strategy.construct)
+  }
+  if (strategy.disrupt && wave >= 5) upgrade(1, 2, 'silencer')
   for (const lane of lanes) place('guard', lane, 3)
   if (wave >= 4) match.dispatch({ type: 'advance', era: 'coil' })
   for (const lane of lanes) {
-    const enemies = WAVES[wave - 1].spawns.filter(spawn => spawn.lane === lane)
+    const enemies = match.waves[wave - 1].spawns.filter(spawn => spawn.lane === lane)
     const swarm = enemies.filter(spawn => spawn.kind === 'skitter').length >= 5
     place(swarm || strategy.splash && lane !== 1 ? 'lobber' : 'archer', lane, 2)
     if (wave >= 4) upgrade(lane, 3, wave === 10 && lane === 1 ? 'bastion' : strategy.guard)
   }
   if (wave >= 4) {
     for (const lane of lanes) {
-      upgrade(lane, 2, strategy.archer)
-      place(wave === 10 && lane === 1 ? 'mender' : strategy.support, lane, 1)
+      if (!strategy.fusion || lane !== 1) upgrade(lane, 2, strategy.archer)
+      const support = wave === 10 && lane === 1 ? 'mender' : strategy.support
+      if (support === 'mender' && !strategy.fusion && wave < 10) put(support, lane, columns[3] - 1)
+      else place(support, lane, 1)
     }
   }
   if (wave >= 8 && strategy.support === 'conductor') {
@@ -67,6 +99,16 @@ export function plan(match, strategy) {
     place('archer', 1, 0)
     upgrade(1, 0, 'longshot')
   }
+  if (strategy.construct === 'relay' && wave >= 6) {
+    const slot = columns[2] - 1
+    put('chassis', 0, slot)
+    const frame = match.view.defenders.find(unit => unit.lane === 0 && unit.slot === slot)
+    if (frame?.kind === 'chassis' && !frame.upgrade) match.dispatch({ type: 'upgrade', id: frame.id, upgrade: 'relay' })
+  }
+  if (strategy.fusion && wave >= 7) {
+    upgrade(1, 3, 'wardplate')
+    upgrade(1, 2, 'arcLance')
+  }
   if (wave >= 6) {
     for (const lane of lanes) {
       place('archer', lane, 1)
@@ -86,8 +128,8 @@ export function resolve(match) {
   return match.lastWave
 }
 
-export function run(strategy) {
-  const match = new Match()
+export function run(strategy, layout) {
+  const match = new Match(layout)
   const waves = []
   while (match.view.phase === 'build') {
     plan(match, strategy)
@@ -99,8 +141,33 @@ export function run(strategy) {
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   if (process.argv.includes('--sweep')) {
+    const scenarios = {
+      economy: strategies.economy,
+      aggressive: strategies.artillery,
+      ranged: { ...strategies.balanced, archer: 'longshot' },
+      fusion: strategies.fusion,
+      anchor: { ...strategies.evolution, opening: [['chassis',0,3], ['guard',1,3], ['archer',0,2]], construct: 'bulwark' },
+      relay: strategies.evolution,
+      mortar: { ...strategies.evolution, opening: [['guard',0,3], ['guard',1,3], ['chassis',0,2]], construct: 'mortar' },
+      disruption: strategies.disruption,
+    }
+    console.table(Object.entries(LAYOUTS).flatMap(([layout, geometry]) =>
+      Object.entries(scenarios).map(([name, strategy]) => {
+        const { phase, waves, core, formation } = run(strategy, geometry)
+        const damage = {}
+        for (const wave of waves) {
+          for (const [kind, amount] of Object.entries(wave.damage)) damage[kind] = (damage[kind] ?? 0) + amount
+        }
+        return { layout, name, phase, core, wave: waves.length, scrap: waves.at(-1).scrap,
+          seconds: Math.round(waves.reduce((total, wave) => total + wave.ticks, 0) * STEP_MS / 1000),
+          standing: formation.filter(unit => unit.hp > 0).length,
+          linked: waves.reduce((total, wave) => total + wave.synergyActions, 0),
+          fusion: formation.filter(unit => DEFENDERS[unit.kind].fused).length,
+          damage: Object.entries(damage).map(([kind, amount]) => `${kind}=${amount}`).join(' ') }
+      })))
+
     const rows = []
-    for (const [opening, strategy] of Object.entries(strategies).filter(([, value]) => value.guard)) {
+    for (const [opening, strategy] of Object.entries(strategies).filter(([name]) => ['economy', 'defense', 'balanced', 'artillery'].includes(name))) {
       for (const guard of ['bastion', 'vanguard']) {
         for (const archer of ['volley', 'longshot']) {
           for (const support of ['conductor', 'mender']) {

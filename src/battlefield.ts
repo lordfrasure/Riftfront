@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser'
-import { CORE_HP, CORE_X, ENEMIES, ENTRY_X, LANES, OVERTIME_TICK, SLOTS, STEP_MS, WIDTH, profile } from './sim/data'
+import { CORE_HP, CORE_X, ENEMIES, ENTRY_X, OVERTIME_TICK, STEP_MS, WIDTH, profile } from './sim/data'
 import type { Effect, Match, Phase } from './sim/match'
 import { drawArena } from './field-art'
 import type { BattleSound } from './sound'
@@ -42,10 +42,10 @@ export class Battlefield extends Phaser.Scene {
     this.add.image(0, 0, 'gorge').setOrigin(0).setDisplaySize(WIDTH, 656).setY(-43)
 
     this.art = this.add.graphics()
-    drawArena(this.art, false)
+    drawArena(this.art, false, this.match().layout)
     this.graphics = this.add.graphics()
     this.foreground = this.add.graphics().setDepth(30)
-    for (const [lane, y] of LANES.entries()) {
+    for (const [lane, y] of this.match().layout.lanes.entries()) {
       this.add.text(53, y - 43, String(lane + 1), {
         fontFamily: 'system-ui', fontSize: '19px', fontStyle: 'bold', color: '#f7d1a0',
         stroke: '#241b2d', strokeThickness: 5,
@@ -106,7 +106,7 @@ export class Battlefield extends Phaser.Scene {
     if (this.coil !== (match.view.era === 'coil')) {
       this.coil = !this.coil
       this.art.clear()
-      drawArena(this.art, this.coil)
+      drawArena(this.art, this.coil, match.layout)
     }
     this.renderMatch(match.view)
   }
@@ -126,7 +126,7 @@ export class Battlefield extends Phaser.Scene {
     }
     if (!breach && !heal && effect.amount < 20) return
     const x = breach ? CORE_X : effect.to
-    const y = LANES[effect.lane] - (breach ? 57 : 46)
+    const y = this.match().layout.lanes[effect.lane] - (breach ? 57 : 46)
     const label = this.add.text(x, y, `${heal ? '+' : '−'}${effect.amount}`, {
       fontFamily: 'system-ui', fontSize: breach ? '27px' : '19px', fontStyle: 'bold',
       color: heal ? '#c1fb9b' : breach ? '#ff8f87' : '#fff4df', stroke: '#201826', strokeThickness: 5,
@@ -138,8 +138,9 @@ export class Battlefield extends Phaser.Scene {
     const g = this.graphics
     g.clear()
     this.foreground.clear()
+    const { lanes, slots } = this.match().layout
     const building = state.phase === 'build'
-    for (const y of LANES) {
+    for (const y of lanes) {
       const light = this.coil ? 0xc7b9ff : 0x90f7ce
       g.fillStyle(light, .12 + state.core / CORE_HP * .2).fillCircle(CORE_X, y - 12, 36)
       g.fillStyle(state.core ? light : 0x613648).fillTriangle(CORE_X - 17, y - 10, CORE_X, y - 38, CORE_X + 17, y - 10)
@@ -162,21 +163,26 @@ export class Battlefield extends Phaser.Scene {
     for (const enemy of state.enemies) {
       const def = ENEMIES[enemy.kind]
       if (enemy.pulseX !== undefined && def.pulse) {
-        const y = LANES[enemy.lane]
+        const y = lanes[enemy.lane]
         const intensity = .3 + .25 * Math.sin(this.clock / 70)
         g.fillStyle(0xfc4d70, intensity).fillEllipse(enemy.pulseX, y + 7, def.pulse.radius * 2, 86)
         g.lineStyle(4, 0xffa788, .85).strokeEllipse(enemy.pulseX, y + 7, def.pulse.radius * 2, 86)
       }
-      if (def.aura) g.lineStyle(2, def.color, .28).strokeEllipse(this.x(enemy), LANES[enemy.lane] + 11, def.aura * 2, 61)
+      if (def.aura && !enemy.disrupted) g.lineStyle(2, def.color, .28).strokeEllipse(this.x(enemy), lanes[enemy.lane] + 11, def.aura * 2, 61)
+    }
+    for (const { source, target, kind } of this.match().links) {
+      const y = lanes[source.lane] + 25
+      g.lineStyle(3, kind === 'sparkLink' ? 0xc7adff : 0xb7eda6, building ? .8 : .46)
+        .lineBetween(this.x(source), y, this.x(target), y)
     }
     const visible = new Set<number>()
     for (const unit of state.defenders) {
       if (unit.hp <= 0) continue
       const def = profile(unit)
-      const y = LANES[unit.lane]
+      const y = lanes[unit.lane]
       const x = this.x(unit)
       if (!building && def.advance) {
-        g.lineStyle(2, def.color, .35).lineBetween(SLOTS[unit.slot], y + 21, x, y + 21)
+        g.lineStyle(2, def.color, .35).lineBetween(slots[unit.slot], y + 21, x, y + 21)
       }
       this.drawActor(visible, unit.id, unit.upgrade ?? unit.kind, x, y, 1)
       if (!building || unit.upgrade) this.health(x, y - 69, unit.hp / def.hp, def.color)
@@ -184,16 +190,17 @@ export class Battlefield extends Phaser.Scene {
     for (const unit of state.enemies) {
       if (unit.hp <= 0) continue
       const def = ENEMIES[unit.kind]
-      const y = LANES[unit.lane] + (unit.kind === 'colossus' ? 0 : (unit.id % 5 - 2) * 5)
+      const y = lanes[unit.lane] + (unit.kind === 'colossus' ? 0 : (unit.id % 5 - 2) * 5)
       const x = this.x(unit)
       this.drawActor(visible, unit.id, unit.kind, x, y, -1, unit.pulseX !== undefined)
       this.health(x, y - (unit.kind === 'colossus' ? 111 : 67), unit.hp / def.hp, def.color, unit.kind === 'colossus' ? 90 : 42)
+      if (unit.disrupted) g.lineStyle(3, 0xff9edc, .8).lineBetween(x - 10, y - 55, x + 10, y - 42)
       if (unit.slow) g.lineStyle(3, 0x9cddff, .68).strokeEllipse(x, y + 19, 51, 15)
       if (unit.expose) this.foreground.lineStyle(3, 0xffe29c).lineBetween(x - 10, y - 45, x + 10, y - 45)
     }
     const fx = this.foreground
     for (const { effect, age } of this.effects) {
-      const y = LANES[effect.lane]
+      const y = lanes[effect.lane]
       const fade = 1 - age / 500
       if (effect.type === 'hit') {
         const duration = effect.style === 'shell' ? 220 : 125

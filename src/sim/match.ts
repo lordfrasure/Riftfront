@@ -1,17 +1,19 @@
+import { formationLinks, fusionRecipe } from './formation.js'
 import { applyDamage, selectTarget, type Combatant } from './combat.js'
 import {
-  ARMOR_EXPOSURE, CORE_HP, CORE_X, DEFENDERS, ENEMIES, ENTRY_X, ERAS, HERALD_ARMOR, LANES, SALVAGE_PAYOUT, SCAVENGER_LIMIT,
-  OVERTIME_DAMAGE, OVERTIME_RAMP, OVERTIME_TICK, SLOTS, STARTING_SCRAP, STEP_MS, UPGRADES, WAVES, profile,
-  type Attack, type DefenderKind, type EnemyKind, type Era, type Lane, type Slot, type UpgradeKind,
+  ARMOR_EXPOSURE, CORE_HP, CORE_X, DEFENDERS, ENEMIES, ENTRY_X, ERAS, HERALD_ARMOR, LAYOUTS, SALVAGE_PAYOUT, SCAVENGER_LIMIT,
+  OVERTIME_DAMAGE, OVERTIME_RAMP, OVERTIME_TICK, SYNERGIES, STARTING_SCRAP, STEP_MS, UPGRADES, WAVES, profile,
+  type Attack, type DefenderKind, type EnemyKind, type Layout, type Era, type Lane, type Slot, type UpgradeKind,
 } from './data.js'
 
 export const REDEPLOY_COST = 8
 
-export interface Defender extends Combatant { kind: DefenderKind; slot: Slot; upgrade?: UpgradeKind }
+export interface Defender extends Combatant { kind: DefenderKind; slot: Slot; upgrade?: UpgradeKind; healCooldown: number }
 export interface Enemy extends Combatant {
   kind: EnemyKind
   slow: number
   expose: number
+  disrupted: number
   charged: boolean
   pulseAt: number
   pulseX?: number
@@ -25,7 +27,9 @@ interface WaveReport {
   income: number
   losses: number
   clearBonus: number
-  coreDamage: [number, number, number]
+  coreDamage: number[]
+  synergyActions: number
+  damage: Partial<Record<DefenderKind, number>>
 }
 
 export type Phase = 'build' | 'battle' | 'victory' | 'defeat'
@@ -33,6 +37,7 @@ export type Command =
   | { type: 'place'; kind: DefenderKind; lane: Lane; slot: Slot }
   | { type: 'redeploy'; id: number; lane: Lane; slot: Slot }
   | { type: 'upgrade'; id: number; upgrade: UpgradeKind }
+  | { type: 'fuse'; first: number; second: number }
   | { type: 'retire'; id: number }
   | { type: 'advance'; era: Era }
   | { type: 'start' }
@@ -44,11 +49,6 @@ export type Effect =
   | { type: 'blast'; lane: Lane; x: number; radius: number }
   | { type: 'breach'; lane: Lane; amount: number }
 
-function validPad(lane: Lane, slot: Slot) {
-  return Number.isInteger(lane) && lane >= 0 && lane < LANES.length &&
-    Number.isInteger(slot) && slot >= 0 && slot < SLOTS.length
-}
-
 export class Match {
   private state = {
     phase: 'build' as Phase, era: 'ember' as Era, scrap: STARTING_SCRAP, core: CORE_HP, wave: 1,
@@ -58,8 +58,27 @@ export class Match {
   private activeReport?: WaveReport
   private completedReport?: WaveReport
 
-  get lastWave(): (Readonly<Omit<WaveReport, 'coreDamage'>> & {
+  readonly waves: readonly (typeof WAVES)[number][]
+
+  constructor(readonly layout: Layout = LAYOUTS.seven) {
+    // Comparative four-lane campaign moves alternating outer-lane spawns to the extra flank.
+    this.waves = layout.lanes.length === 4 ? WAVES.map(wave => {
+      let flank = 0
+      return { ...wave, spawns: wave.spawns.map(spawn =>
+        spawn.lane === 2 && flank++ % 2 === 1 ? { ...spawn, lane: 3 } : spawn) }
+    }) : WAVES
+  }
+
+  get links() { return formationLinks(this.state.defenders) }
+
+  private validPad(lane: Lane, slot: Slot) {
+    return Number.isInteger(lane) && lane >= 0 && lane < this.layout.lanes.length &&
+      Number.isInteger(slot) && slot >= 0 && slot < this.layout.slots.length
+  }
+
+  get lastWave(): (Readonly<Omit<WaveReport, 'coreDamage' | 'damage'>> & {
     readonly coreDamage: readonly number[]
+    readonly damage: Readonly<WaveReport['damage']>
   }) | undefined {
     return this.completedReport
   }
@@ -80,7 +99,7 @@ export class Match {
         state.spawned = 0
         this.activeReport = {
           wave: state.wave, ticks: 0, kills: 0, bounty: 0, income: 0, losses: 0,
-          clearBonus: 0, coreDamage: [0, 0, 0],
+          clearBonus: 0, coreDamage: this.layout.lanes.map(() => 0), synergyActions: 0, damage: {},
         }
         state.phase = 'battle'
         return
@@ -95,28 +114,29 @@ export class Match {
       }
       case 'place': {
         const { kind, lane, slot } = command
-        if (!validPad(lane, slot) || !Object.hasOwn(DEFENDERS, kind)) return 'Invalid placement.'
+        if (!this.validPad(lane, slot) || !Object.hasOwn(DEFENDERS, kind)) return 'Invalid placement.'
         if (this.occupied(lane, slot)) return 'That pad is occupied.'
         const unit = DEFENDERS[kind]
+        if (unit.fused) return 'This defender can only be created by fusion.'
         if (unit.era && unit.era !== state.era) return 'Unlock the Coil Age first.'
         if (kind === 'scavenger' && state.defenders.filter(defender => defender.kind === kind).length >= SCAVENGER_LIMIT) {
           return 'Only two Scavengers can operate at once.'
         }
         if (state.scrap < unit.cost) return 'You need more scrap.'
         state.scrap -= unit.cost
-        state.defenders.push({ id: this.nextId++, kind, lane, slot, x: SLOTS[slot], hp: unit.hp, cooldown: 0 })
+        state.defenders.push({ id: this.nextId++, kind, lane, slot, x: this.layout.slots[slot], hp: unit.hp, cooldown: 0, healCooldown: 0 })
         return
       }
       case 'redeploy': {
         const { id, lane, slot } = command
         const unit = state.defenders.find(defender => defender.id === id)
-        if (!unit || !validPad(lane, slot)) return 'Invalid destination.'
+        if (!unit || !this.validPad(lane, slot)) return 'Invalid destination.'
         if (this.occupied(lane, slot)) return 'Choose an open destination.'
         if (state.scrap < REDEPLOY_COST) return 'You need more scrap.'
         state.scrap -= REDEPLOY_COST
         unit.lane = lane
         unit.slot = slot
-        unit.x = SLOTS[slot]
+        unit.x = this.layout.slots[slot]
         return
       }
       case 'retire': {
@@ -126,11 +146,24 @@ export class Match {
         state.defenders = state.defenders.filter(defender => defender.id !== unit.id)
         return
       }
+      case 'fuse': {
+        const first = state.defenders.find(unit => unit.id === command.first)
+        const second = state.defenders.find(unit => unit.id === command.second)
+        const merge = first && second && fusionRecipe(first, second)
+        if (!merge) return 'Choose compatible, unupgraded defenders on consecutive pads in the same lane.'
+        const { recipe, front, rear } = merge
+        if (state.scrap < recipe.cost) return 'You need more scrap.'
+        state.scrap -= recipe.cost
+        state.defenders = state.defenders.filter(unit => unit !== front && unit !== rear)
+        state.defenders.push({ id: this.nextId++, kind: recipe.result, lane: front.lane, slot: front.slot,
+          x: front.x, hp: DEFENDERS[recipe.result].hp, cooldown: 0, healCooldown: 0 })
+        return
+      }
       case 'upgrade': {
         const unit = state.defenders.find(defender => defender.id === command.id)
-        if (!unit || unit.upgrade || !Object.hasOwn(UPGRADES, command.upgrade)) return 'Retrofit unavailable.'
+        if (!unit || !Object.hasOwn(UPGRADES, command.upgrade)) return 'Retrofit unavailable.'
         const upgrade = UPGRADES[command.upgrade]
-        if (upgrade.base !== unit.kind || state.era !== 'coil') return 'Retrofit unavailable.'
+        if (upgrade.base !== unit.kind || upgrade.requires !== unit.upgrade || (upgrade.era === 'coil' && state.era !== 'coil')) return 'Retrofit unavailable.'
         if (state.scrap < upgrade.cost) return 'You need more scrap.'
         state.scrap -= upgrade.cost
         unit.upgrade = command.upgrade
@@ -151,12 +184,12 @@ export class Match {
     const state = this.state
     const report = this.activeReport
     if (state.phase !== 'battle' || !report) return effects
-    const wave = WAVES[state.wave - 1]
+    const wave = this.waves[state.wave - 1]
     report.ticks = ++state.tick
     while (state.spawned < wave.spawns.length && wave.spawns[state.spawned].tick <= state.tick) {
       const { lane, kind } = wave.spawns[state.spawned++]
       state.enemies.push({ id: this.nextId++, kind, lane, x: ENTRY_X, hp: ENEMIES[kind].hp, cooldown: 0,
-        charged: false, slow: 0, expose: 0, pulseAt: state.tick + 35 })
+        charged: false, slow: 0, expose: 0, disrupted: 0, pulseAt: state.tick + 35 })
     }
 
     for (const unit of state.defenders) {
@@ -171,7 +204,7 @@ export class Match {
     if (state.core === 0) {
       state.phase = 'defeat'
     } else if (state.spawned === wave.spawns.length && state.enemies.length === 0) {
-      state.phase = state.wave === WAVES.length ? 'victory' : 'build'
+      state.phase = state.wave === this.waves.length ? 'victory' : 'build'
       report.income = state.defenders.filter(unit => unit.kind === 'scavenger' && unit.hp > 0).length * SALVAGE_PAYOUT
       report.clearBonus = wave.grant
       state.scrap += report.income + report.clearBonus
@@ -179,8 +212,9 @@ export class Match {
         state.wave++
         for (const unit of state.defenders) {
           unit.hp = profile(unit).hp
-          unit.x = SLOTS[unit.slot]
+          unit.x = this.layout.slots[unit.slot]
           unit.cooldown = 0
+          unit.healCooldown = 0
         }
       }
     }
@@ -190,30 +224,21 @@ export class Match {
 
   private actDefender(unit: Defender, report: WaveReport, effects: Effect[]) {
     const { attack, advance, heal, color } = profile(unit)
+    if (heal) this.repair(unit, heal, color, report, effects)
     if (!attack) return
     unit.cooldown = Math.max(0, unit.cooldown - 1)
-    if (heal) {
-      if (unit.cooldown > 0) return
-      const target = this.state.defenders.filter(ally => ally.lane === unit.lane && ally.id !== unit.id &&
-        ally.hp > 0 && ally.hp < profile(ally).hp && Math.abs(ally.x - unit.x) <= attack.range)
-        .sort((a, b) => a.hp / profile(a).hp - b.hp / profile(b).hp || a.id - b.id)[0]
-      if (!target) return
-      const amount = Math.min(heal, profile(target).hp - target.hp)
-      target.hp += amount
-      unit.cooldown = attack.cooldown
-      effects.push({ type: 'hit', style: 'heal', lane: unit.lane, from: unit.x, to: target.x, source: unit.id, target: target.id, amount, color })
-      return
-    }
 
     const enemies = this.state.enemies
     let target = selectTarget(unit, enemies, attack.range, 1)
-    if (unit.upgrade === 'longshot' && target) {
+    if (attack.priority && target) {
+      const priority = (enemy: Enemy) => attack.priority === 'toughest'
+        ? ENEMIES[enemy.kind].hp : Number(Boolean(ENEMIES[enemy.kind].aura))
       target = enemies.filter(enemy => enemy.hp > 0 && enemy.lane === unit.lane &&
         enemy.x >= unit.x && enemy.x - unit.x <= attack.range)
-        .sort((a, b) => ENEMIES[b.kind].hp - ENEMIES[a.kind].hp || a.x - b.x || a.id - b.id)[0]
+        .sort((a, b) => priority(b) - priority(a) || a.x - b.x || a.id - b.id)[0]
     }
     if (!target) {
-      const home = SLOTS[unit.slot]
+      const home = this.layout.slots[unit.slot]
       const opponent = selectTarget(unit, enemies, Infinity, 1)
       const leash = advance ?? 65
       const goal = opponent ? Math.max(home, Math.min(home + leash, opponent.x - attack.range)) : home
@@ -223,30 +248,53 @@ export class Match {
     }
     if (unit.cooldown > 0) return
     unit.cooldown = attack.cooldown
-    const style = advance ? 'strike' : unit.kind === 'lobber' ? 'shell' : unit.kind === 'conductor' ? 'coil' : 'arrow'
+    const style = advance ? 'strike' : attack.style ?? 'arrow'
+    const linked = !advance && this.links.some(link => link.kind === 'sparkLink' && link.target.id === unit.id)
+    if (linked) report.synergyActions++
     const splash = attack.splash
     const victims = splash ? enemies.filter(enemy => enemy.hp > 0 && enemy.lane === unit.lane &&
       Math.abs(enemy.x - target.x) <= splash) : [target]
     for (const enemy of victims) {
       const armor = ENEMIES[enemy.kind].armor + (enemies.some(ally => {
         const aura = ENEMIES[ally.kind].aura
-        return aura && ally.id !== enemy.id && ally.hp > 0 && ally.lane === enemy.lane && Math.abs(ally.x - enemy.x) <= aura
+        return aura && ally.disrupted <= 0 && ally.id !== enemy.id && ally.hp > 0 && ally.lane === enemy.lane && Math.abs(ally.x - enemy.x) <= aura
       }) ? HERALD_ARMOR : 0)
       const before = enemy.hp
-      applyDamage(enemy, attack.damage, Math.max(0, armor - (attack.pierce ?? 0) - (enemy.expose > 0 ? ARMOR_EXPOSURE.amount : 0)))
+      applyDamage(enemy, attack.damage + (linked ? SYNERGIES.sparkLink.bonus : 0), Math.max(0, armor - (attack.pierce ?? 0) - (enemy.expose > 0 ? ARMOR_EXPOSURE.amount : 0)))
+      report.damage[unit.kind] = (report.damage[unit.kind] ?? 0) + before - enemy.hp
+      if (attack.disrupt && ENEMIES[enemy.kind].aura) enemy.disrupted = attack.disrupt
       if (attack.expose) enemy.expose = ARMOR_EXPOSURE.ticks
       if (attack.slow) enemy.slow = attack.slow
       if (enemy === target) effects.push({ type: 'hit', lane: unit.lane, from: unit.x, to: enemy.x,
         source: unit.id, target: enemy.id, style, amount: before - enemy.hp, splash: attack.splash, color })
       if (enemy.hp === 0) {
         const definition = ENEMIES[enemy.kind]
-        const reward = Math.ceil(definition.reward * WAVES[this.state.wave - 1].bountyRate)
+        const reward = Math.ceil(definition.reward * this.waves[this.state.wave - 1].bountyRate)
         this.state.scrap += reward
         report.bounty += reward
         report.kills++
         effects.push({ type: 'fall', id: enemy.id, lane: enemy.lane, x: enemy.x, color: definition.color })
       }
     }
+  }
+
+  private repair(unit: Defender, heal: NonNullable<ReturnType<typeof profile>['heal']>,
+    color: number, report: WaveReport, effects: Effect[]) {
+    unit.healCooldown = Math.max(0, unit.healCooldown - 1)
+    if (unit.healCooldown > 0) return
+    const target = this.state.defenders.filter(ally => ally.lane === unit.lane && ally.id !== unit.id &&
+      ally.hp > 0 && ally.hp < profile(ally).hp && Math.abs(ally.x - unit.x) <= heal.range)
+      .sort((a, b) => a.hp / profile(a).hp - b.hp / profile(b).hp || a.id - b.id)[0]
+    if (!target) return
+    const missing = profile(target).hp - target.hp
+    const linked = missing > heal.amount && this.links.some(link => link.kind === 'fieldDressing' &&
+      link.source.id === unit.id && link.target.id === target.id)
+    if (linked) report.synergyActions++
+    const amount = Math.min(heal.amount + (linked ? SYNERGIES.fieldDressing.bonus : 0), missing)
+    target.hp += amount
+    unit.healCooldown = heal.cooldown
+    effects.push({ type: 'hit', style: 'heal', lane: unit.lane, from: unit.x, to: target.x,
+      source: unit.id, target: target.id, amount, color })
   }
 
   private actEnemy(enemy: Enemy, report: WaveReport, effects: Effect[]) {
@@ -256,6 +304,7 @@ export class Match {
     const rage = state.tick < OVERTIME_TICK ? 0
       : OVERTIME_DAMAGE * (1 + Math.floor((state.tick - OVERTIME_TICK) / OVERTIME_RAMP))
     enemy.cooldown = Math.max(0, enemy.cooldown - 1)
+    enemy.disrupted = Math.max(0, enemy.disrupted - 1)
     enemy.expose = Math.max(0, enemy.expose - 1)
     const stride = definition.speed * STEP_MS / 1000 * (enemy.slow > 0 ? .55 : 1)
     enemy.slow = Math.max(0, enemy.slow - 1)

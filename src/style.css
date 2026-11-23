@@ -63,15 +63,16 @@ button:disabled { opacity: .66; cursor: default; }
 #core-meter::-webkit-progress-value { background: var(--core); border-radius: 3px; }
 #core-meter::-moz-progress-bar { background: var(--core); }
 #core-meter.critical { --core: #ff9a87; }
-.match { display: grid; grid-template: "field intel" auto "orders intel" auto / minmax(0, 1fr) clamp(210px, 22%, 306px); gap: 12px; align-items: start; }
-.field { grid-area: field; position: relative; aspect-ratio: 1280 / 570; container-type: inline-size; background: #1b282d; border: 1px solid #61645a; border-radius: 8px; overflow: hidden; }
+.match { display: grid; grid-template-columns: minmax(0, 1fr) clamp(210px, 22%, 306px); gap: 12px; align-items: start; }
+.formation-board { display: grid; gap: 12px; min-width: 0; }
+.field { position: relative; aspect-ratio: 1280 / 570; container-type: inline-size; background: #1b282d; border: 1px solid #61645a; border-radius: 8px; overflow: hidden; }
 #game, #pads, .paused { position: absolute; inset: 0; }
 #game canvas { display: block; width: 100% !important; height: 100% !important; }
 .field-legend { position: absolute; inset: 2.5% 3% auto; z-index: 1; display: flex; justify-content: space-between; color: #fff1d5; font-size: clamp(.6rem, 1.2vw, .74rem); font-weight: 800; text-transform: uppercase; letter-spacing: .12em; pointer-events: none; }
 .field-legend span:last-child { color: #ffbfda; }
 #pads { pointer-events: none; }
 .pad {
-  position: absolute; width: max(8.5%, 32px); height: max(15%, 29px); transform: translate(-50%, -50%);
+  position: absolute; width: 7.6%; height: max(15%, 29px); transform: translate(-50%, -50%);
   background: transparent; border: 1px solid #f7dfab65; padding: 0; min-height: 0; pointer-events: auto; border-radius: 5px;
 }
 .pad:hover:not(:disabled), .pad:focus-visible, .pad.inspected { background: #fff0d81a; border: 1px solid var(--unit-color); z-index: 1; }
@@ -79,10 +80,10 @@ button:disabled { opacity: .66; cursor: default; }
   content: ''; position: absolute; left: 50%; top: 67%; width: var(--range); height: 3px;
   background: var(--unit-color); transform: translateY(-50%); pointer-events: none; visibility: hidden;
 }
-.pad:hover::after, .pad:focus-visible::after { visibility: visible; }
+.pad:hover:not(:disabled)::after, .pad:focus-visible::after { visibility: visible; }
 .pad.occupied:not(.inspected):not(:hover):not(:focus-visible) { border-color: transparent; }
 .pad.occupied::after { display: none; }
-.workbench { grid-area: orders; min-width: 0; }
+.workbench { min-width: 0; }
 .order-heading { justify-content: flex-start; margin-bottom: 7px; gap: 4px 14px; }
 .order-heading h2 { font-size: 1.22rem; }
 #feedback { color: var(--muted); margin: 0; font-size: .81rem; }
@@ -97,7 +98,7 @@ button:disabled { opacity: .66; cursor: default; }
 .unit.unaffordable .price { color: #f3a192; }
 .unit.locked .price::after { content: ' · Coil Age'; }
 .standby .unit[aria-pressed="true"] { box-shadow: none; border-color: var(--line); }
-.intel { grid-area: intel; display: grid; gap: 8px; }
+.intel { display: grid; gap: 8px; }
 .intel section, #inspector, #collection article { background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 13px; }
 .intel h2 { font-size: clamp(1.12rem, 2vw, 1.5rem); margin: 4px 0 6px; }
 .intel p, #inspector p, #collection p { margin: 4px 0 8px; color: var(--muted); font-size: .84rem; }
@@ -108,7 +109,8 @@ summary { cursor: pointer; font-size: .81rem; padding: 3px 0; }
 #inspector { display: grid; grid-template-columns: auto 1fr; gap: 9px; }
 #inspector h2 { font-size: 1.16rem; }
 #inspector .actions, #retrofits { grid-column: 1 / -1; }
-#retrofits { display: flex; gap: 7px; flex-wrap: wrap; }
+#evolution-heading { font-size: .9rem; margin-bottom: 6px; }
+#evolution-branches { display: grid; gap: 7px; margin-left: 5px; padding-left: 10px; border-left: 1px solid #978dc6; }
 #retrofits:not(:has(button:not([hidden]))) { display: none; }
 #retrofits button { display: flex; align-items: center; text-align: left; gap: 8px; }
 #retrofits img { width: 37px; }
@@ -131,7 +133,7 @@ dialog::backdrop { background: #060d12c7; }
 #result h2 { font-size: clamp(2rem, 8vw, 3.5rem); }
 #result .actions { margin-top: 17px; }
 @media (max-width: 870px) {
-  .match { grid-template: "field" "orders" "intel" / minmax(0, 1fr); }
+  .match { grid-template-columns: minmax(0, 1fr); }
   .intel { grid-template-columns: repeat(auto-fit, minmax(min(100%, 225px), 1fr)); }
 }
 @media (max-width: 560px) {
@@ -145,7 +147,7 @@ dialog::backdrop { background: #060d12c7; }
   .commandbar { padding: 6px 8px; }
   .metrics { width: 100%; justify-content: space-between; }
   .core-stat { min-width: 79px; }
-  .pad { width: max(9%, 34px); }
+  .pad { height: max(15%, 34px); }
   #units, #collection { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .unit { gap: 5px; }
   .unit .portrait { width: 39px; }
@@ -158,3 +160,14 @@ dialog::backdrop { background: #060d12c7; }
 @media (max-width: 560px) {
   .unit .price { display: block; white-space: normal; }
 }
+
+.pad.linked.occupied { border-color: #9edfd48c; box-shadow: inset 0 -3px #9edfd4aa; }
+.pad.fusion-target.occupied { border-color: #ffdb92; background: #ffdb9239; box-shadow: 0 0 9px #ffdb9270; }
+#retrofits button { position: relative; }
+#retrofits button::before { content: ''; position: absolute; inset-inline-start: -12px; top: 50%; width: 11px; border-top: 1px solid #978dc6; }
+#retrofits .branch-stats { margin-top: 6px; color: #e4edeb; }
+#fusion-preview { grid-column: 1 / -1; display: grid; grid-template-columns: auto 1fr; gap: 8px; padding: 8px; border: 1px solid var(--line); border-radius: 5px; }
+#confirm-fusion { grid-column: 1 / -1; }
+#unit-links, #fusion-rule { grid-column: 1 / -1; }
+#unit-links:empty, #fusion-rule:empty { display: none; }
+#inspector.fusing #retrofits, #inspector.fusing #retire, #inspector.fusing #move { display: none; }

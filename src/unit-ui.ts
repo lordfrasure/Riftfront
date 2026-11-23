@@ -1,5 +1,5 @@
 import { fighterImage, type FighterArt } from './art/fighters'
-import { ARMOR_EXPOSURE, DEFENDERS, ERAS, STEP_MS, UPGRADES, profile,
+import { ARMOR_EXPOSURE, DEFENDERS, ERAS, FUSIONS, SYNERGIES, STEP_MS, UPGRADES, profile,
   type DefenderDefinition, type DefenderKind, type UpgradeKind } from './sim/data'
 
 export function portrait(art: FighterArt) {
@@ -14,8 +14,10 @@ export function statItems(unit: DefenderDefinition) {
   const { attack, heal, hp, armor, advance } = unit
   return listItems([
     `${hp} HP`, `${armor ?? 0} armor`,
-    ...(attack ? [heal ? `${heal} healing` : `${attack.damage} damage`,
+    ...(attack ? [`${attack.damage} damage`,
       `${attack.cooldown * STEP_MS / 1000}s interval`, `${attack.range} range`] : []),
+    ...(heal ? [`${heal.amount} healing · ${heal.range} range · ${heal.cooldown * STEP_MS / 1000}s`] : []),
+    ...(attack?.disrupt ? [`${attack.disrupt * STEP_MS / 1000}s aura disruption`] : []),
     ...(advance ? [`${advance} advance`] : []),
     ...(attack?.splash ? [`${attack.splash} splash radius`] : []),
     ...(attack?.pierce ? [`${attack.pierce} armor pierce`] : []),
@@ -42,7 +44,10 @@ export function buildCollection(root: HTMLElement) {
     title.textContent = unit.label
     const cost = document.createElement('p')
     cost.className = 'subtitle'
-    cost.textContent = `${unit.cost} scrap · ${ERAS[unit.era ?? 'ember'].label}`
+    const recipe = FUSIONS.find(entry => entry.result === kind)
+    cost.textContent = recipe
+      ? `Fuse ${DEFENDERS[recipe.front].label} ahead of ${DEFENDERS[recipe.rear].label} · ${recipe.cost} scrap`
+      : `${unit.cost} scrap · ${ERAS[unit.era ?? 'ember'].label}`
     const heading = document.createElement('div')
     heading.append(title, cost)
     header.append(portrait(kind), heading)
@@ -57,7 +62,7 @@ export function buildCollection(root: HTMLElement) {
       if (upgrade.base !== kind) continue
       const branch = document.createElement('details')
       const summary = document.createElement('summary')
-      summary.textContent = `${upgrade.label} · ${upgrade.cost} scrap · ${ERAS.coil.label}`
+      summary.textContent = `${upgrade.label} · ${upgrade.cost} scrap · ${ERAS[upgrade.era ?? 'ember'].label}`
       const description = document.createElement('p')
       description.textContent = upgrade.role
       const comparison = document.createElement('ul')
@@ -65,6 +70,12 @@ export function buildCollection(root: HTMLElement) {
       comparison.append(...statItems(profile({ kind, upgrade: key })))
       branch.append(summary, portrait(key), description, comparison)
       entry.append(branch)
+    }
+    if (kind === 'guard' || kind === 'mender' || unit.attack && !unit.advance || kind === 'chassis') {
+      const combo = document.createElement('p')
+      const rule = kind === 'guard' || kind === 'mender' ? SYNERGIES.fieldDressing : SYNERGIES.sparkLink
+      combo.textContent = `${rule.label} · ${rule.description}`
+      entry.append(combo)
     }
     root.append(entry)
   }

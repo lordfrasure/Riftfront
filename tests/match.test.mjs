@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { applyDamage, selectTarget } from '../.test-build/combat.js'
-import { CORE_HP, DEFENDERS, ENEMIES, ERAS, LANES, OVERTIME_TICK, SALVAGE_PAYOUT, SCAVENGER_LIMIT, SLOTS, UPGRADES, WAVES, profile } from '../.test-build/data.js'
+import { CORE_HP, DEFENDERS, ENEMIES, ERAS, FUSIONS, LANES, LAYOUTS, OVERTIME_TICK, SALVAGE_PAYOUT, SCAVENGER_LIMIT, SLOTS, SYNERGIES, UPGRADES, WAVES, profile } from '../.test-build/data.js'
+import { formationLinks } from '../.test-build/formation.js'
 import { Match, REDEPLOY_COST } from '../.test-build/match.js'
 import { plan, run, strategies } from './balance.mjs'
 
@@ -124,6 +125,22 @@ describe('planning and progression', () => {
     assert.equal(place(match, 'conductor', 0, 1), undefined)
   })
 
+  it('rejects a fusion with a retrofitted input and preserves the investment', () => {
+    const match = new Match()
+    while (match.view.wave < ERAS.coil.wave) {
+      plan(match, strategies.balanced)
+      finish(match)
+    }
+    const guard = match.view.defenders.find(unit => unit.kind === 'guard' && unit.lane === 1)
+    assert.equal(place(match, 'mender', guard.lane, guard.slot - 1), undefined)
+    const healer = match.view.defenders.at(-1)
+    assert.equal(match.dispatch({ type: 'advance', era: 'coil' }), undefined)
+    assert.equal(match.dispatch({ type: 'upgrade', id: guard.id, upgrade: 'bastion' }), undefined)
+    const before = structuredClone(match.view)
+    assert.ok(match.dispatch({ type: 'fuse', first: guard.id, second: healer.id }))
+    assert.deepEqual(match.view, before)
+  })
+
   it('plays distinct winning runs and produces deterministic results', () => {
     const economy = run(strategies.economy)
     const artillery = run(strategies.artillery)
@@ -191,5 +208,178 @@ describe('planning and progression', () => {
     assert.ok(match.dispatch({ type: 'start' }))
     assert.deepEqual(match.tick(), [])
     assert.deepEqual(match.view, snapshot)
+  })
+})
+
+describe('expanded formations', () => {
+  it('validates the last pad and reports core damage for each layout lane', () => {
+    for (const layout of Object.values(LAYOUTS)) {
+      const match = new Match(layout)
+      const lane = layout.lanes.length - 1
+      const slot = layout.slots.length - 1
+      assert.equal(place(match, 'guard', lane, slot), undefined)
+      assert.equal(match.view.defenders[0].x, layout.slots[slot])
+      assert.ok(place(match, 'guard', lane + 1, slot))
+      assert.ok(place(match, 'guard', lane, slot + 1))
+      finish(match)
+      assert.equal(match.lastWave.coreDamage.length, layout.lanes.length)
+      assert.equal(match.waves.flatMap(wave => wave.spawns).length, WAVES.flatMap(wave => wave.spawns).length)
+    }
+  })
+
+  it('rejects invalid or unaffordable fusion without consuming either input', () => {
+    const match = new Match()
+    assert.ok(place(match, 'wardkeeper', 0, 0))
+    place(match, 'guard', 0, 6)
+    place(match, 'mender', 0, 4)
+    place(match, 'lobber', 1, 6)
+    const [guard, healer, lobber] = match.view.defenders
+    const fuse = (first, second) => match.dispatch({ type: 'fuse', first, second })
+    const before = structuredClone(match.view)
+    for (const partner of [guard.id, healer.id, lobber.id, 999]) assert.ok(fuse(guard.id, partner))
+    assert.deepEqual(match.view, before)
+    finish(match)
+    assert.equal(match.dispatch({ type: 'redeploy', id: healer.id, lane: 0, slot: 5 }), undefined)
+    assert.equal(match.dispatch({ type: 'redeploy', id: guard.id, lane: 0, slot: 4 }), undefined)
+    const reversed = structuredClone(match.view)
+    assert.ok(fuse(guard.id, healer.id))
+    assert.deepEqual(match.view, reversed)
+
+    const poor = new Match()
+    place(poor, 'guard', 0, 6)
+    place(poor, 'mender', 0, 5)
+    place(poor, 'lobber', 1, 6)
+    const snapshot = structuredClone(poor.view)
+    assert.match(poor.dispatch({ type: 'fuse', first: 1, second: 2 }), /scrap/)
+    assert.deepEqual(poor.view, snapshot)
+  })
+
+  it('fuses either selection order to a fresh unit at the forward pad, with no resale or recursive merge', () => {
+    const match = new Match()
+    place(match, 'guard', 0, 6)
+    place(match, 'mender', 0, 5)
+    const before = match.view.scrap
+    const fusion = { type: 'fuse', first: 2, second: 1 }
+    assert.equal(match.dispatch(fusion), undefined)
+    const [ward] = match.view.defenders
+    assert.equal(match.view.defenders.length, 1)
+    assert.deepEqual([ward.id, ward.slot, ward.kind, ward.hp], [3, 6, 'wardkeeper', DEFENDERS.wardkeeper.hp])
+    assert.equal(match.view.scrap, before - FUSIONS[0].cost)
+    finish(match)
+    assert.equal(place(match, 'mender', 0, 5), undefined)
+    assert.ok(match.dispatch(fusion))
+    assert.ok(match.dispatch({ type: 'fuse', first: ward.id, second: 4 }))
+    const scrap = match.view.scrap
+    assert.equal(match.dispatch({ type: 'retire', id: ward.id }), undefined)
+    assert.equal(match.view.scrap, scrap)
+  })
+
+  it('applies Field Dressing only from consecutive pads, with live range and removal checks', () => {
+    const match = new Match()
+    place(match, 'guard', 0, 6)
+    place(match, 'mender', 0, 5)
+    place(match, 'guard', 1, 6)
+    assert.deepEqual(match.links.map(link => link.kind), ['fieldDressing'])
+    const effects = finish(match)
+    assert.ok(effects.some(effect => effect.style === 'heal' && effect.amount > DEFENDERS.mender.heal.amount))
+    assert.ok(match.lastWave.synergyActions > 0)
+    assert.equal(match.dispatch({ type: 'redeploy', id: 2, lane: 0, slot: 4 }), undefined)
+    assert.deepEqual(match.links, [])
+    const guard = { ...match.view.defenders[0], x: 1200 }
+    const mender = { ...match.view.defenders[1], slot: 5 }
+    assert.deepEqual(formationLinks([guard, mender]), [])
+    assert.deepEqual(formationLinks([{ ...guard, x: mender.x + 100, hp: 0 }, mender]), [])
+  })
+
+  it('evolves in Ember and caps ranged damage to one nearby Spark Relay', () => {
+    const match = new Match()
+    place(match, 'chassis', 0, 3)
+    place(match, 'archer', 0, 4)
+    assert.ok(match.dispatch({ type: 'upgrade', id: 1, upgrade: 'mortar' }))
+    assert.equal(match.dispatch({ type: 'upgrade', id: 1, upgrade: 'relay' }), undefined)
+    assert.ok(match.dispatch({ type: 'upgrade', id: 1, upgrade: 'bulwark' }))
+    assert.deepEqual(match.links.map(link => link.kind), ['sparkLink'])
+    const effects = finish(match)
+    assert.ok(effects.some(effect => effect.source === 2 && effect.amount === DEFENDERS.archer.attack.damage + SYNERGIES.sparkLink.bonus))
+    assert.ok(!effects.some(effect => effect.source === 1))
+    const [relay, archer] = match.view.defenders
+    assert.equal(formationLinks([relay, archer, { ...relay, id: 99, slot: 5 }]).length, 1)
+    assert.equal(formationLinks([{ ...relay, hp: 0 }, archer]).length, 0)
+
+    const anchor = new Match()
+    place(anchor, 'chassis', 0, 6)
+    place(anchor, 'guard', 1, 6)
+    assert.equal(anchor.dispatch({ type: 'upgrade', id: 1, upgrade: 'bulwark' }), undefined)
+    let slowed = false
+    finish(anchor, view => { slowed ||= view.enemies.some(enemy => enemy.lane === 0 && enemy.slow > 0) })
+    assert.ok(slowed)
+  })
+
+  it('lets a Wardkeeper attack and repair a front ally independently', () => {
+    const match = new Match()
+    place(match, 'guard', 0, 5)
+    place(match, 'mender', 0, 4)
+    assert.equal(match.dispatch({ type: 'fuse', first: 1, second: 2 }), undefined)
+    assert.ok(finish(match).some(effect => effect.source === 3 && effect.style === 'strike'))
+    assert.equal(place(match, 'guard', 0, 6), undefined)
+    const front = match.view.defenders.at(-1)
+    const effects = finish(match)
+    assert.ok(effects.some(effect => effect.source === 3 && effect.style === 'heal' && effect.target === front.id))
+  })
+
+  it('uses both fusions and their abilities in a distinct deterministic winning campaign', () => {
+    const match = new Match()
+    let rangerExposure = false
+    while (match.view.phase === 'build') {
+      plan(match, strategies.fusion)
+      const ranger = match.view.defenders.find(unit => unit.kind === 'arcRanger')
+      finish(match, (view, effects) => {
+        rangerExposure ||= effects.some(effect => effect.source === ranger?.id &&
+          view.enemies.some(enemy => enemy.id === effect.target && enemy.expose > 0))
+      })
+    }
+    assert.equal(match.view.phase, 'victory')
+    assert.ok(rangerExposure)
+    assert.ok(match.view.defenders.some(unit => unit.upgrade === 'wardplate'))
+    assert.ok(match.view.defenders.some(unit => unit.upgrade === 'arcLance'))
+    assert.deepEqual(run(strategies.fusion), run(strategies.fusion))
+  })
+
+  it('uses the base Saboteur to prioritize a Herald behind other enemies', () => {
+    const match = new Match()
+    let prioritized = false
+    while (match.view.phase === 'build' && !prioritized) {
+      plan(match, { ...strategies.disruption, disrupt: false })
+      const saboteur = match.view.defenders.find(unit => unit.kind === 'saboteur')
+      finish(match, (view, effects) => {
+        for (const hit of effects.filter(effect => effect.type === 'hit' && effect.source === saboteur?.id)) {
+          const herald = view.enemies.find(enemy => enemy.id === hit.target && enemy.kind === 'herald')
+          prioritized ||= Boolean(herald?.disrupted && view.enemies.some(enemy =>
+            enemy.lane === herald.lane && enemy.x > hit.from && enemy.x < herald.x))
+        }
+      })
+    }
+    assert.ok(prioritized)
+  })
+
+  it('fires Ash Mortar shells and suppresses Herald armor with the Hush Battery', () => {
+    for (const [strategy, upgrade, check] of [
+      [{ ...strategies.evolution, opening: [['guard',0,3], ['guard',1,3], ['chassis',0,2]], construct: 'mortar' }, 'mortar',
+        (view, effect) => effect.style === 'shell' && effect.splash === UPGRADES.mortar.changes.attack.splash],
+      [strategies.disruption, 'silencer',
+        (view, effect) => effect.style === 'shell' &&
+          view.enemies.some(enemy => enemy.id === effect.target && enemy.kind === 'herald' && enemy.disrupted > 0)],
+    ]) {
+      const match = new Match()
+      let used = false
+      while (match.view.phase === 'build' && !used) {
+        plan(match, strategy)
+        const specialist = match.view.defenders.find(unit => unit.upgrade === upgrade)
+        finish(match, (view, effects) => {
+          used ||= effects.some(effect => effect.source === specialist?.id && check(view, effect))
+        })
+      }
+      assert.ok(used, upgrade)
+    }
   })
 })

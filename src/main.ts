@@ -5,9 +5,10 @@ import { BattleSound } from './sound'
 import { buildCollection, listItems, portrait, statItems } from './unit-ui'
 import { fighterImage } from './art/fighters'
 import {
-  CORE_HP, DEFENDERS, ENEMIES, ERAS, HEIGHT, LANES, OVERTIME_TICK, SLOTS, STARTING_SCRAP, UPGRADES, WAVES, WIDTH, profile,
+  CORE_HP, DEFENDERS, ENEMIES, ERAS, FUSIONS, SYNERGIES, HEIGHT, OVERTIME_TICK, STARTING_SCRAP, UPGRADES, WAVES, WIDTH, profile,
   type DefenderKind, type EnemyKind, type Lane, type Slot, type UpgradeKind,
 } from './sim/data'
+import { fusionRecipe } from './sim/formation'
 import { Match, REDEPLOY_COST, type Command } from './sim/match'
 
 function element(id: string) { return document.getElementById(id)! }
@@ -18,12 +19,15 @@ let match = new Match()
 let selected: DefenderKind = 'guard'
 let inspected: number | undefined
 let moving = false
+let fusing = false
+let partnerId: number | undefined
 let fast = false
 let paused = false
 let displayedForecast = 0
 let displayedReport: Match['lastWave']
 const sound = new BattleSound()
 const feedback = element('feedback')
+const fusionPortrait = element('fusion-portrait') as HTMLImageElement
 const inspectorPortrait = element('unit-portrait') as HTMLImageElement
 const start = button('start')
 const pause = button('pause')
@@ -38,7 +42,7 @@ let kills = 0
 let routed = 0
 let completedWaves = 0
 
-const cards = (Object.keys(DEFENDERS) as DefenderKind[]).map(kind => {
+const cards = (Object.keys(DEFENDERS) as DefenderKind[]).filter(kind => !DEFENDERS[kind].fused).map(kind => {
   const unit = DEFENDERS[kind]
   const control = document.createElement('button')
   control.className = 'unit'
@@ -58,7 +62,8 @@ const cards = (Object.keys(DEFENDERS) as DefenderKind[]).map(kind => {
     feedback.classList.remove('error')
     selected = kind
     inspected = undefined
-    moving = false
+    moving = fusing = false
+    partnerId = undefined
     feedback.textContent = `${unit.label} selected. Choose an empty pad.`
     updateHud()
   }
@@ -66,16 +71,20 @@ const cards = (Object.keys(DEFENDERS) as DefenderKind[]).map(kind => {
   return { kind, control }
 })
 
-const pads = LANES.flatMap((y, row) => SLOTS.map((x, column) => {
-  const lane = row as Lane
-  const slot = column as Slot
+const pads = match.layout.lanes.flatMap((y, lane) => match.layout.slots.map((x, slot) => {
   const control = document.createElement('button')
   control.className = 'pad'
   control.style.left = `${x / WIDTH * 100}%`
   control.style.top = `${y / HEIGHT * 100}%`
   control.onclick = () => {
     const unit = occupant(lane, slot)
-    if (unit) {
+    if (fusing) {
+      if (!unit) return
+      partnerId = unit.id
+      updateHud()
+      element('fusion-preview').scrollIntoView({ block: 'nearest' })
+      button('confirm-fusion').focus({ preventScroll: true })
+    } else if (unit) {
       feedback.classList.remove('error')
       inspected = unit.id
       moving = false
@@ -98,15 +107,18 @@ const upgradeButtons = (Object.keys(UPGRADES) as UpgradeKind[]).map(upgrade => {
   const name = document.createElement('strong')
   name.textContent = `${definition.label} · ${definition.cost} scrap`
   const details = document.createElement('small')
+  const stats = document.createElement('small')
+  stats.className = 'branch-stats'
+  stats.textContent = statItems(profile({ kind: definition.base, upgrade })).map(item => item.textContent).join(' · ')
   details.textContent = definition.role
   const copy = document.createElement('span')
-  copy.append(name, details)
+  copy.append(name, details, stats)
   control.append(portrait(upgrade), copy)
   control.onclick = () => {
     if (inspected !== undefined) issue({ type: 'upgrade', id: inspected, upgrade }, `${definition.label} retrofit installed.`)
   }
-  element('retrofits').append(control)
-  return { definition, control }
+  element('evolution-branches').append(control)
+  return { definition, control, details }
 })
 
 function occupant(lane: Lane, slot: Slot) {
@@ -116,7 +128,9 @@ function occupant(lane: Lane, slot: Slot) {
 function issue(command: Command, success: string) {
   const error = match.dispatch(command)
   if (!error) {
-    moving = false
+    moving = fusing = false
+    partnerId = undefined
+    if (command.type === 'fuse') inspected = match.view.defenders.at(-1)?.id
     if (command.type === 'retire' || command.type === 'start') inspected = undefined
   }
   feedback.textContent = error ?? success
@@ -125,7 +139,7 @@ function issue(command: Command, success: string) {
   if (error || matchMedia('(prefers-reduced-motion: reduce)').matches) return
   const target = command.type === 'place' || command.type === 'redeploy'
     ? pads.find(pad => pad.lane === command.lane && pad.slot === command.slot)?.control
-    : command.type === 'upgrade' ? inspectorPortrait : undefined
+    : command.type === 'upgrade' || command.type === 'fuse' ? inspectorPortrait : undefined
   target?.animate([{ boxShadow: '0 0 0 2px #fff1b9' }, { boxShadow: '0 0 0 12px transparent' }],
     { duration: 370, easing: 'ease-out' })
 }
@@ -136,7 +150,10 @@ function updateHud() {
   const battling = state.phase === 'battle'
   const unit = building ? state.defenders.find(candidate => candidate.id === inspected) : undefined
   const foundry = state.era === 'coil'
-  const shown = WAVES[state.wave - 1]
+  const shown = match.waves[state.wave - 1]
+  const links = building ? match.links : []
+  const partner = state.defenders.find(candidate => candidate.id === partnerId)
+  const merge = unit && partner && fusionRecipe(unit, partner)
   element('scrap').textContent = String(state.scrap)
   element('core').textContent = `${state.core} / ${CORE_HP}`
   const meter = element('core-meter') as HTMLProgressElement
@@ -167,22 +184,27 @@ function updateHud() {
     control.classList.toggle('locked', locked)
   }
   const recruit = moving && unit ? profile(unit) : DEFENDERS[selected]
-  const reach = (recruit.attack?.range ?? 0) + (recruit.advance ?? 0)
+  const reach = (recruit.attack?.range ?? recruit.heal?.range ?? 0) + (recruit.advance ?? 0)
   for (const { lane, slot, control } of pads) {
     control.hidden = !building
     if (!building) continue
     const defender = occupant(lane, slot)
+    const eligible = Boolean(fusing && unit && defender && fusionRecipe(unit, defender))
+    control.disabled = fusing && !eligible
+    control.classList.toggle('fusion-target', eligible)
+    control.classList.toggle('linked', links.some(link => link.target.id === defender?.id || link.source.id === defender?.id))
     control.classList.toggle('occupied', Boolean(defender))
     control.classList.toggle('inspected', Boolean(unit && defender?.id === unit.id))
     control.style.setProperty('--unit-color', color(recruit.color))
-    control.style.setProperty('--range', `${Math.min(reach, WIDTH - SLOTS[slot]) / WIDTH * 100}cqw`)
+    control.style.setProperty('--range', `${Math.min(reach, WIDTH - match.layout.slots[slot]) / WIDTH * 100}cqw`)
     const location = `lane ${lane + 1}, pad ${slot + 1}`
     control.setAttribute('aria-label', defender
-      ? `Inspect ${profile(defender).label} in ${location}`
+      ? `${eligible ? 'Fuse with' : 'Inspect'} ${profile(defender).label} in ${location}`
       : `${moving ? 'Move' : 'Place'} ${recruit.label} in ${location}`)
   }
 
   element('inspector').hidden = !unit
+  element('inspector').classList.toggle('fusing', fusing)
   if (unit) {
     const definition = profile(unit)
     element('unit-name').textContent = `${definition.label} · Lane ${unit.lane + 1}`
@@ -192,9 +214,39 @@ function updateHud() {
     button('move').textContent = moving ? 'Cancel redeploy' : `Redeploy · ${REDEPLOY_COST}`
     button('move').disabled = !moving && state.scrap < REDEPLOY_COST
     button('retire').textContent = `Retire +${Math.floor(DEFENDERS[unit.kind].cost / 3)}`
-    for (const { definition: option, control } of upgradeButtons) {
-      control.hidden = !foundry || Boolean(unit.upgrade) || option.base !== unit.kind
-      control.disabled = state.scrap < option.cost
+    const active = links.filter(link => link.source.id === unit.id || link.target.id === unit.id)
+    const potential = unit.kind === 'guard' || unit.kind === 'mender' ? SYNERGIES.fieldDressing
+      : unit.kind === 'chassis' && (!unit.upgrade || unit.upgrade === 'relay') || definition.attack && !definition.advance
+        ? SYNERGIES.sparkLink : undefined
+    element('unit-links').textContent = active.length
+      ? active.map(link => `${SYNERGIES[link.kind].label} active with ${profile(link.source.id === unit.id ? link.target : link.source).label}`).join(' · ')
+      : potential ? `${potential.label} · ${potential.description}` : ''
+    for (const { definition: option, control, details } of upgradeButtons) {
+      const locked = option.era === 'coil' && !foundry
+      control.hidden = option.requires !== unit.upgrade || option.base !== unit.kind
+      control.disabled = fusing || locked || state.scrap < option.cost
+      details.textContent = locked ? `Requires Coil Age. ${option.role}` : option.role
+    }
+    const branchCount = upgradeButtons.filter(({ control }) => !control.hidden).length
+    element('evolution-heading').textContent = branchCount > 1 ? 'Evolve · choose one branch' : 'Evolve'
+    const recipes = unit.upgrade ? [] : FUSIONS.filter(recipe => recipe.front === unit.kind || recipe.rear === unit.kind)
+    element('fusion-rule').textContent = merge ? '' : recipes.map(recipe =>
+      `${DEFENDERS[recipe.result].label} · ${recipe.cost} scrap. Place an unupgraded ${DEFENDERS[recipe.front].label} immediately ahead of an unupgraded ${DEFENDERS[recipe.rear].label}.`).join(' ')
+    const hasPartner = state.defenders.some(candidate => fusionRecipe(unit, candidate))
+    button('fuse').hidden = recipes.length === 0
+    button('fuse').disabled = !hasPartner
+    button('fuse').title = hasPartner ? '' : 'Position the recipe ingredients on consecutive pads.'
+    button('fuse').textContent = fusing ? 'Cancel fusion' : 'Fuse…'
+    element('fusion-preview').hidden = !merge
+    if (merge) {
+      const result = DEFENDERS[merge.recipe.result]
+      fusionPortrait.src = fighterImage(merge.recipe.result)
+      element('fusion-name').textContent = result.label
+      element('fusion-role').textContent = result.role
+      element('fusion-placement').textContent = `Consumes both defenders. Keeps pad ${merge.front.slot + 1} and frees pad ${merge.rear.slot + 1}.`
+      element('fusion-stats').replaceChildren(...statItems(result))
+      button('confirm-fusion').textContent = `Confirm fusion · ${merge.recipe.cost} scrap`
+      button('confirm-fusion').disabled = state.scrap < merge.recipe.cost
     }
   }
 
@@ -221,10 +273,10 @@ function updateIntel() {
   element('intel-heading').textContent = phase === 'build' ? `Incoming · Wave ${wave}` : `Siege · Wave ${wave}`
   if (displayedForecast !== wave) {
     displayedForecast = wave
-    const { title, tip, spawns } = WAVES[wave - 1]
+    const { title, tip, spawns } = match.waves[wave - 1]
     element('wave-title').textContent = title
     element('tip').textContent = tip
-    element('forecast').replaceChildren(...LANES.map((_, lane) => {
+    element('forecast').replaceChildren(...match.layout.lanes.map((_, lane) => {
       const counts = new Map<EnemyKind, number>()
       for (const spawn of spawns) {
         if (spawn.lane === lane) counts.set(spawn.kind, (counts.get(spawn.kind) ?? 0) + 1)
@@ -257,7 +309,7 @@ function updateIntel() {
   element('report-heading').textContent = `Wave ${report.wave} report`
   const damage = report.coreDamage.flatMap((amount, lane) => amount ? [`Lane ${lane + 1} −${amount}`] : [])
   element('report-damage').textContent = damage.length ? `Core breached · ${damage.join(' / ')}` : 'Core held in every lane.'
-  element('report-losses').textContent = `${report.kills} defeated · ${report.losses} routed`
+  element('report-losses').textContent = `${report.kills} defeated · ${report.losses} routed · ${report.synergyActions} boosted actions`
   element('report-economy').textContent = `+${report.bounty} bounty · +${report.income} salvage · +${report.clearBonus} grant`
 }
 
@@ -266,7 +318,8 @@ function reset() {
   match = new Match()
   inspected = undefined
   selected = 'guard'
-  moving = false
+  moving = fusing = false
+  partnerId = undefined
   paused = false
   kills = routed = completedWaves = 0
   result.close()
@@ -278,8 +331,32 @@ function reset() {
 
 start.onclick = () => issue({ type: 'start' }, 'Defenders engage automatically.')
 advance.onclick = () => issue({ type: 'advance', era: 'coil' }, 'Coil Age unlocked. Recruit Coilcasters or inspect a Guard or Archer to retrofit.')
+button('fuse').onclick = () => {
+  moving = false
+  fusing = !fusing
+  partnerId = undefined
+  feedback.classList.remove('error')
+  feedback.textContent = fusing ? 'Choose a highlighted partner to preview fusion.' : 'Fusion canceled.'
+  updateHud()
+  if (fusing) pads.find(pad => !pad.control.disabled)?.control.focus()
+}
+button('confirm-fusion').onclick = () => {
+  if (inspected !== undefined && partnerId !== undefined) {
+    issue({ type: 'fuse', first: inspected, second: partnerId }, 'Fusion complete. The rear pad is free.')
+    if (!fusing) button('move').focus()
+  }
+}
+siege.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && fusing) {
+    event.preventDefault()
+    button('fuse').click()
+    button('fuse').focus()
+  }
+})
 button('move').onclick = () => {
   feedback.classList.remove('error')
+  fusing = false
+  partnerId = undefined
   moving = !moving
   feedback.textContent = moving ? 'Choose an empty pad in any lane.' : 'Redeploy canceled.'
   updateHud()
