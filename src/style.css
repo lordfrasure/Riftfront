@@ -171,3 +171,10 @@ dialog::backdrop { background: #060d12c7; }
 #unit-links, #fusion-rule { grid-column: 1 / -1; }
 #unit-links:empty, #fusion-rule:empty { display: none; }
 #inspector.fusing #retrofits, #inspector.fusing #retire, #inspector.fusing #move { display: none; }
+
+.seed-controls { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-block: 1rem; }
+.seed-controls input { width: 11ch; padding: .5rem; color: inherit; background: #16151c; border: 1px solid #62586a; border-radius: .35rem; }
+#route-options { display: grid; gap: .65rem; margin-top: .65rem; }
+#route-options button { display: grid; gap: .35rem; text-align: left; }
+#route-options small { color: #ffcf8b; }
+#reserve { margin-top: .75rem; }

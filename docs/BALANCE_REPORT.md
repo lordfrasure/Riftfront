@@ -193,3 +193,31 @@ Conservative and ranged both held at 100 through wave 5. The opening Lobber paid
 All 24 simulation tests passed. The production build passed with the existing Vite chunk-size warning. The legacy balance sweep completed. Desktop Chromium at 1440 × 900 executed the fusion policy through victory at 88 core, including the Wardkeeper merge and brace report. Browser core and scrap matched the paired headless run after each tested wave.
 
 Touch Chromium at 390 × 844 executed the protected salvage policy through wave 5 at 76 core. It verified touch orders, the Raider route and breach attribution, the marked-attack forecasts, and the aimed-shot report. Neither browser run reported page errors.
+
+## Branching sieges
+
+Baseline `bc97268` and candidate `experiment/branching-sieges`. The owner reported another easy first-playthrough win on the baseline. In the candidate each pair of offered fronts changes two waves and pays its reward after the first clear. The garrison has 8, 9, then 11 active places. Routed defenders require one wave off or 18 scrap to repair. Redeployment is free so the reserve and direct redeployment have the same cost. The economy removes 6 scrap from clear grants after wave 1 and multiplies bounty rates by 0.8 starting in wave 5. The late schedule delays the second and third center formations on wave 9 and the Skitter rush on wave 10. The final front sends its last reinforcements behind the Colossus.
+
+```sh
+npm test
+node tests/branching-sieges.mjs
+node tests/branching-sieges.mjs --json
+node tests/branching-sieges.mjs --fork
+```
+
+The lab runs the same planner families across the fixed vertical slice, individual capacity, recovery, routes, economy and timing changes, and the complete redesign. Seeds 11, 29, 47, 83 and 101 control offer and reinforcement selection. Control schedules are fixed, so the repeated controls give a matched reference for each seed. The JSON includes the selected front, purchases, formation, reserve availability, reward attribution, and combat incidents. The planner has limited repositioning and uses simple purchase priorities. These results describe the scripted policies.
+
+| Policy | Fixed baseline wins / 5 | Complete rework wins / 5 | Complete rework details |
+| --- | ---: | ---: | --- |
+| Old broad-coverage planner | 5 | 0 | Finishes the control at 76 core. Falls on wave 4 in every candidate run after losing defenders and fielding just four by wave 4 on seed 11. |
+| Shield and Wardkeeper | 0 | 2 | Wins at 100 core on seeds 11 and 83. The control planner's purchases and timing fall short despite the broader pool of places. |
+| Ranged precision | 5 | 1 | Reaches the finale on all five seeds. Wins seed 47 at 32 core. |
+| Anchor and Foundry | 5 | 2 | Wins seed 11 at 100 core and seed 29 at 74. Seed 29 recovered from 54 core after wave 6 via a relief reward. |
+| Single salvage into combat | 5 | 0 | Reaches the finale on four seeds, with earlier reserve pressure and a vulnerable center. A scripted win remains unproven. |
+| Always take specialist fronts, no recovery or counter swaps | 5 | 2 | Wins at 61 and 44 on seeds 47 and 101. These matchups still reward raw composition. |
+
+Capacity alone ended the old planner at the Colossus. Recovery alone ended it on wave 5. Routes alone left all five old-policy runs viable at 79–100 core. On the complete candidate the additive pressure and missed recovery opportunities ended the same purchasing policy on wave 4. The shield planner cleared with capacity, routes, economy, or timing in isolation, which shows an interaction between its fusion purchase timing and the rules. The initial 8/9/10 limit made the finale unreliable across specialties. The current 8/9/11 limit, staggered late attacks and reserve rotation allowed wins with multiple builds.
+
+The fork comparison changes only the first front selection and then applies the same decision rules. On seed 11, shield went from defeat on Relief March to a 100-core victory on Crossfire. Foundry went from 100 core on Relief March to 43 on Crossfire. On seed 47, Foundry went from defeat on Relief March to 100 core on Armor Column, while precision dropped from 61 to 32. Route selection and rewards change later purchases, so these are campaign effects rather than pure encounter damage comparisons. Some seeded specialist wins still end at full core, and the all-specialist policy won two seeds. Individual route difficulty varies with the reinforcement lane and garrison.
+
+All 27 simulation tests passed. The production build passed with Vite's existing chunk-size warning. Desktop Chromium played seed 29 through the Foundry victory at 74 core and confirmed that replay retained the seed. Touch Chromium played a salvage opening through wave 5 at 59 core. Both runs compared core and scrap against the simulator at every wave and exercised front selection, reserve orders, and recovery. Human playtesting remains the test of whether a loss feels fair and prompts another run.

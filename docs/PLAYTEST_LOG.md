@@ -32,7 +32,9 @@ Pending human session. Use control `cb49d71` and candidate `3b4dec5` with their 
 
 ### Combat and strategy vertical slice
 
-Pending human session and owner decision. Use control `6fe17f6` and `experiment/combat-strategy-slice`. Run `npm run dev` in each checkout and choose **Begin siege**. Play waves 1–5 or until defeat, once per build, using only in-game information. If testing with multiple players, alternate which build they see first. Before each wave, write down the threat, the order you considered but skipped, and the defender or lane you think is most at risk. After each wave, record core, routes, and your explanation before checking the report.
+The owner reported an easy first-attempt campaign victory on the vertical slice and requested a major redesign of difficulty, decisions, and replayability. This rejects the slice as sufficient for the milestone. The army, ending core, and wave-by-wave decisions were unspecified.
+
+For a paired follow-up session, use control `6fe17f6` and candidate `bc97268`. Run `npm run build` and then `npm run preview -- --host 127.0.0.1` in each checkout. Open the printed URL and choose **Begin siege**. Play waves 1–5 or until defeat, once per build, using only in-game information. If testing with multiple players, alternate which build they see first. Before each wave, write down the threat, the order you considered but skipped, and the defender or lane you think is most at risk. After each wave, record core, routes, and your explanation before checking the report.
 
 Then replay the candidate. If the first run used an Archer, try a Cinder Lobber in lane 1 or an Anchor Frame with a Guard in lane 2. If the first run spent heavily on defense, try two Guards with a Scavenger on the rearmost lane 2 pad and recover after the opening. Try leaving a pad between lane 1's front and ranged support for the Ram, then compare closer support against the aimed Spitters. Continue one successful run through wave 10 to check the handoff.
 
@@ -40,4 +42,16 @@ Then replay the candidate. If the first run used an Archer, try a Cinder Lobber 
 2. Which defender did you expect to be in danger, and could you explain the first route or breach after combat?
 3. Which build would you voluntarily try next, and what do you expect it to handle better?
 
-Record the decision after the session. See the [paired comparison](BALANCE_REPORT.md#combat-and-strategy-vertical-slice).
+See the [paired comparison](BALANCE_REPORT.md#combat-and-strategy-vertical-slice).
+
+### Branching sieges
+
+Use `experiment/branching-sieges`. Build the game with `npm run build`, then run `npm run preview -- --host 127.0.0.1` and open the printed URL. Choose **New seed**, note the number, and play one complete run unaided. Record which front you picked, which reward you passed up, and when you changed the active garrison. If a defender routes, decide whether to repair it or cover its place while it rests.
+
+Replay that seed using **Play again** or by entering the same number in the briefing. Use a different opening army and choose the other front at the first checkpoint. If you want a reproducible comparison after the blind runs, seed 11 and seed 29 show different advantages for shield and Foundry policies in the lab.
+
+1. Which front or roster decision was hardest, and did the forecast give you enough information to make it?
+2. Which loss or near miss changed your next plan? Could you recover with a reserve swap, repair, or different front?
+3. Would you begin a third siege voluntarily? Which army and seed would you choose, and why?
+
+Decision pending human feedback and owner approval.

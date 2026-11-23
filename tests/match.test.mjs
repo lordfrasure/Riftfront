@@ -483,3 +483,92 @@ describe('vertical slice encounters', () => {
     assert.equal(match.lastWave.losses, 0)
   })
 })
+
+describe('branching sieges', () => {
+  const emptySchedule = () => WAVES.map(wave => ({ ...wave, spawns: [], bountyRate: 0, grant: 100 }))
+
+  it('repeats route offers by seed, gates launch, and applies the chosen pair and reward once', () => {
+    const matches = [new Match(LAYOUTS.seven, emptySchedule(), 11), new Match(LAYOUTS.seven, emptySchedule(), 11)]
+    for (const match of matches) {
+      for (let i = 0; i < 2; i++) {
+        assert.equal(match.dispatch({ type: 'start' }), undefined)
+        match.tick()
+      }
+    }
+    const [match, replay] = matches
+    assert.deepEqual(match.siege.offers, replay.siege.offers)
+    assert.equal(match.siege.offers.length, 2)
+    assert.match(match.dispatch({ type: 'start' }), /Choose a front/)
+    assert.match(match.dispatch({ type: 'route', choice: 9 }), /Choose an offered front/)
+    const front = match.siege.offers[1]
+    assert.equal(match.dispatch({ type: 'route', choice: 1 }), undefined)
+    assert.match(match.dispatch({ type: 'route', choice: 0 }), /Choose an offered front/)
+    assert.deepEqual(match.waves.slice(2, 4), front.waves)
+    assert.equal(place(match, 'guard', 0, 6), undefined)
+    assert.equal(place(match, 'guard', 1, 6), undefined)
+    assert.equal(place(match, 'guard', 2, 6), undefined)
+    assert.equal(match.dispatch({ type: 'start' }), undefined)
+    while (match.view.phase === 'battle') match.tick()
+    assert.equal(match.lastWave.routeReward, front.reward)
+    assert.equal(match.siege.credits[front.reward], 1)
+    assert.equal(match.dispatch({ type: 'start' }), undefined)
+    while (match.view.phase === 'battle') match.tick()
+    assert.equal(match.lastWave.routeReward, undefined)
+    assert.equal(match.siege.credits[front.reward], 1)
+    assert.equal(match.view.wave, 5)
+    assert.equal(front.reward, 'shield')
+    assert.equal(match.dispatch({ type: 'advance', era: 'coil' }), undefined)
+    assert.equal(match.upgradePrice('bastion'), 4)
+    const guard = match.view.defenders.find(unit => unit.kind === 'guard')
+    assert.ok(guard)
+    assert.equal(match.dispatch({ type: 'upgrade', id: guard.id, upgrade: 'bastion' }), undefined)
+    assert.equal(match.siege.credits.shield, 0)
+    assert.equal(match.upgradePrice('bastion'), 48)
+    assert.equal(match.siege.capacity, 9)
+  })
+
+  it('enforces the active limit, preserves reserve identities, and charges only for early repair', () => {
+    const schedule = emptySchedule()
+    schedule[1].spawns = [{ kind: 'raider', lane: 0, tick: 1 }, { kind: 'raider', lane: 0, tick: 1 }]
+    const match = new Match(LAYOUTS.seven, schedule, 101)
+    assert.equal(place(match, 'scavenger', 0, 6), undefined)
+    finish(match)
+    finish(match)
+    const [{ unit, readyWave }] = match.siege.reserve
+    assert.equal(unit.kind, 'scavenger')
+    assert.equal(readyWave, 4)
+    assert.match(match.dispatch({ type: 'activate', id: unit.id, lane: 1, slot: 6 }), /unavailable/)
+    const before = match.view.scrap
+    assert.equal(match.dispatch({ type: 'repair', id: unit.id }), undefined)
+    assert.equal(before - match.view.scrap, 18)
+    assert.equal(match.dispatch({ type: 'activate', id: unit.id, lane: 1, slot: 6 }), undefined)
+    assert.equal(match.view.defenders[0].id, unit.id)
+    // Fund the remaining garrison from the next cleared wave.
+    assert.equal(match.dispatch({ type: 'route', choice: 0 }), undefined)
+    assert.equal(place(match, 'guard', 0, 6), undefined)
+    assert.equal(place(match, 'guard', 1, 5), undefined)
+    assert.equal(place(match, 'guard', 2, 6), undefined)
+    assert.equal(match.dispatch({ type: 'start' }), undefined)
+    while (match.view.phase === 'battle') match.tick()
+    for (let i = 0; i < 4; i++) assert.equal(place(match, 'chassis', 0, i), undefined)
+    assert.match(place(match, 'guard', 0, 5), /garrison is full/)
+    assert.equal(match.dispatch({ type: 'reserve', id: unit.id }), undefined)
+    assert.equal(place(match, 'guard', 0, 5), undefined)
+    assert.match(match.dispatch({ type: 'activate', id: unit.id, lane: 1, slot: 6 }), /garrison is full/)
+  })
+
+  it('rests a routed defender for one wave and pays salvage only while active', () => {
+    const schedule = emptySchedule()
+    schedule[0].spawns = [{ kind: 'raider', lane: 0, tick: 1 }, { kind: 'raider', lane: 0, tick: 1 }]
+    const match = new Match(LAYOUTS.seven, schedule, 29, { routes: false })
+    assert.equal(place(match, 'scavenger', 0, 6), undefined)
+    finish(match)
+    assert.equal(match.lastWave.income, 0)
+    assert.equal(match.siege.reserve[0].readyWave, 3)
+    finish(match)
+    assert.equal(match.lastWave.income, 0)
+    assert.equal(match.dispatch({ type: 'activate', id: 1, lane: 2, slot: 0 }), undefined)
+    finish(match)
+    assert.equal(match.lastWave.income, 11)
+  })
+})

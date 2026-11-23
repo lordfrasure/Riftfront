@@ -1,3 +1,4 @@
+import { commandLimit, CREDIT_VALUE, RECOVERY_COST, ROUTE_REWARDS, routeOffers, siegeSchedule, UPGRADE_CREDITS, type Credit, type Reward, type RouteOffer, type SiegeRules } from './siege.js'
 import { formationLinks, fusionRecipe } from './formation.js'
 import { applyDamage, selectTarget, type Combatant } from './combat.js'
 import {
@@ -33,6 +34,8 @@ interface CombatIncident {
 
 interface WaveReport {
   incidents: CombatIncident[]
+  routeReward?: Reward
+  recovery?: number
   wave: number
   ticks: number
   kills: number
@@ -53,6 +56,10 @@ export type Command =
   | { type: 'fuse'; first: number; second: number }
   | { type: 'retire'; id: number }
   | { type: 'advance'; era: Era }
+  | { type: 'reserve'; id: number }
+  | { type: 'activate'; id: number; lane: Lane; slot: Slot }
+  | { type: 'repair'; id: number }
+  | { type: 'route'; choice: number }
   | { type: 'start' }
 
 export type Effect =
@@ -72,15 +79,58 @@ export class Match {
   private activeReport?: WaveReport
   private completedReport?: WaveReport
 
-  readonly waves: readonly Wave[]
+  private readonly schedule: Wave[]
+  private offers: readonly RouteOffer[] = []
+  private pendingReward?: Reward
+  private reserve: { unit: Defender; readyWave: number }[] = []
+  private credits: Record<Credit, number> = { shield: 0, precision: 0, foundry: 0 }
+  private routeHistory: { wave: number; title: string; lane: Lane }[] = []
 
-  constructor(readonly layout: Layout = LAYOUTS.seven, waves?: readonly Wave[]) {
+  get waves(): readonly Wave[] { return this.schedule }
+
+  get siege() {
+    if (this.seed === undefined) return undefined
+    return { seed: this.seed, offers: this.offers, capacity: this.capacity,
+      reserve: this.reserve as readonly { readonly unit: Readonly<Defender>; readonly readyWave: number }[],
+      credits: this.credits as Readonly<Record<Credit, number>>, pendingReward: this.pendingReward,
+      routes: this.routeHistory as readonly Readonly<{ wave: number; title: string; lane: Lane }>[] }
+  }
+
+  private get capacity() {
+    return this.seed !== undefined && this.rules.capacity !== false
+      ? commandLimit(this.state.wave) : this.layout.lanes.length * this.layout.slots.length
+  }
+
+  get redeployPrice() { return this.seed === undefined ? REDEPLOY_COST : 0 }
+
+  upgradePrice(upgrade: UpgradeKind) {
+    const credit = UPGRADE_CREDITS[upgrade]
+    return this.discountedPrice(UPGRADES[upgrade].cost, credit)
+  }
+
+  fusionPrice(cost: number, kind: DefenderKind) {
+    return this.discountedPrice(cost, kind === 'wardkeeper' ? 'shield' : 'precision')
+  }
+
+  private discountedPrice(cost: number, credit?: Credit) {
+    return credit && this.credits[credit] ? Math.max(0, cost - CREDIT_VALUE) : cost
+  }
+
+  private spend(cost: number, credit?: Credit) {
+    const price = this.discountedPrice(cost, credit)
+    if (this.state.scrap < price) return false
+    this.state.scrap -= price
+    if (credit && price < cost) this.credits[credit]--
+    return true
+  }
+
+  constructor(readonly layout: Layout = LAYOUTS.seven, waves?: readonly Wave[], readonly seed?: number, private readonly rules: SiegeRules = {}) {
     // Comparative four-lane campaign moves alternating outer-lane spawns to the extra flank.
-    this.waves = waves ?? (layout.lanes.length === 4 ? WAVES.map(wave => {
+    this.schedule = [...(waves ?? (seed !== undefined ? siegeSchedule(rules) : layout.lanes.length === 4 ? WAVES.map(wave => {
       let flank = 0
       return { ...wave, spawns: wave.spawns.map(spawn =>
         spawn.lane === 2 && flank++ % 2 === 1 ? { ...spawn, lane: 3 } : spawn) }
-    }) : WAVES)
+    }) : WAVES))]
   }
 
   get links() { return formationLinks(this.state.defenders) }
@@ -109,7 +159,45 @@ export class Match {
     const state = this.state
     if (state.phase !== 'build') return 'Orders are available during planning.'
     switch (command.type) {
+      case 'route': {
+        const offer = this.offers[command.choice]
+        if (!offer) return 'Choose an offered front.'
+        this.schedule.splice(state.wave - 1, 2, ...offer.waves)
+        this.pendingReward = offer.reward
+        this.routeHistory.push({ wave: state.wave, title: offer.title, lane: offer.lane })
+        this.offers = []
+        return
+      }
+      case 'reserve': {
+        if (this.seed === undefined) return 'Reserve unavailable.'
+        const unit = state.defenders.find(defender => defender.id === command.id)
+        if (!unit) return 'Select a deployed defender.'
+        state.defenders = state.defenders.filter(defender => defender !== unit)
+        this.reserve.push({ unit, readyWave: state.wave })
+        return
+      }
+      case 'repair': {
+        const entry = this.reserve.find(candidate => candidate.unit.id === command.id)
+        if (!entry || entry.readyWave <= state.wave) return 'Select a defender in recovery.'
+        if (!this.spend(RECOVERY_COST)) return 'You need more scrap.'
+        entry.readyWave = state.wave
+        return
+      }
+      case 'activate': {
+        const entry = this.reserve.find(candidate => candidate.unit.id === command.id)
+        if (!entry || entry.readyWave > state.wave) return 'That defender is unavailable.'
+        if (!this.validPad(command.lane, command.slot) || this.occupied(command.lane, command.slot)) return 'Choose an open pad.'
+        if (state.defenders.length >= this.capacity) return 'The garrison is full. Send a defender to reserve.'
+        const { unit } = entry
+        unit.lane = command.lane
+        unit.slot = command.slot
+        unit.x = this.layout.slots[unit.slot]
+        state.defenders.push(unit)
+        this.reserve = this.reserve.filter(candidate => candidate !== entry)
+        return
+      }
       case 'start':
+        if (this.offers.length) return 'Choose a front before launching.'
         state.tick = 0
         state.spawned = 0
         this.activeReport = {
@@ -131,10 +219,11 @@ export class Match {
         const { kind, lane, slot } = command
         if (!this.validPad(lane, slot) || !Object.hasOwn(DEFENDERS, kind)) return 'Invalid placement.'
         if (this.occupied(lane, slot)) return 'That pad is occupied.'
+        if (this.seed !== undefined && state.defenders.length >= this.capacity) return 'The garrison is full. Send a defender to reserve.'
         const unit = DEFENDERS[kind]
         if (unit.fused) return 'This defender can only be created by fusion.'
         if (unit.era && unit.era !== state.era) return 'Unlock the Coil Age first.'
-        if (kind === 'scavenger' && state.defenders.filter(defender => defender.kind === kind).length >= SCAVENGER_LIMIT) {
+        if (kind === 'scavenger' && [...state.defenders, ...this.reserve.map(entry => entry.unit)].filter(defender => defender.kind === kind).length >= SCAVENGER_LIMIT) {
           return 'Only two Scavengers can operate at once.'
         }
         if (state.scrap < unit.cost) return 'You need more scrap.'
@@ -147,8 +236,7 @@ export class Match {
         const unit = state.defenders.find(defender => defender.id === id)
         if (!unit || !this.validPad(lane, slot)) return 'Invalid destination.'
         if (this.occupied(lane, slot)) return 'Choose an open destination.'
-        if (state.scrap < REDEPLOY_COST) return 'You need more scrap.'
-        state.scrap -= REDEPLOY_COST
+        if (!this.spend(this.redeployPrice)) return 'You need more scrap.'
         unit.lane = lane
         unit.slot = slot
         unit.x = this.layout.slots[slot]
@@ -167,8 +255,7 @@ export class Match {
         const merge = first && second && fusionRecipe(first, second)
         if (!merge) return 'Choose compatible, unupgraded defenders on consecutive pads in the same lane.'
         const { recipe, front, rear } = merge
-        if (state.scrap < recipe.cost) return 'You need more scrap.'
-        state.scrap -= recipe.cost
+        if (!this.spend(recipe.cost, recipe.result === 'wardkeeper' ? 'shield' : 'precision')) return 'You need more scrap.'
         state.defenders = state.defenders.filter(unit => unit !== front && unit !== rear)
         state.defenders.push({ id: this.nextId++, kind: recipe.result, lane: front.lane, slot: front.slot,
           x: front.x, hp: DEFENDERS[recipe.result].hp, cooldown: 0, healCooldown: 0 })
@@ -179,8 +266,7 @@ export class Match {
         if (!unit || !Object.hasOwn(UPGRADES, command.upgrade)) return 'Retrofit unavailable.'
         const upgrade = UPGRADES[command.upgrade]
         if (upgrade.base !== unit.kind || upgrade.requires !== unit.upgrade || (upgrade.era === 'coil' && state.era !== 'coil')) return 'Retrofit unavailable.'
-        if (state.scrap < upgrade.cost) return 'You need more scrap.'
-        state.scrap -= upgrade.cost
+        if (!this.spend(upgrade.cost, UPGRADE_CREDITS[command.upgrade])) return 'You need more scrap.'
         unit.upgrade = command.upgrade
         unit.hp = profile(unit).hp
         return
@@ -223,8 +309,27 @@ export class Match {
       report.income = state.defenders.filter(unit => unit.kind === 'scavenger' && unit.hp > 0).length * SALVAGE_PAYOUT
       report.clearBonus = wave.grant
       state.scrap += report.income + report.clearBonus
+      if (this.pendingReward) {
+        const reward = this.pendingReward
+        report.routeReward = reward
+        if (reward === 'scrap') state.scrap += ROUTE_REWARDS.scrap.amount
+        else if (reward === 'repair') state.core = Math.min(CORE_HP, state.core + ROUTE_REWARDS.repair.amount)
+        else this.credits[reward]++
+        this.pendingReward = undefined
+      }
       if (state.phase === 'build') {
         state.wave++
+        if (this.seed !== undefined && this.rules.recovery !== false) {
+          const routed = state.defenders.filter(unit => unit.hp <= 0)
+          for (const unit of routed) {
+            unit.hp = profile(unit).hp
+            unit.cooldown = unit.healCooldown = 0
+            this.reserve.push({ unit, readyWave: state.wave + 1 })
+          }
+          state.defenders = state.defenders.filter(unit => !routed.includes(unit))
+          report.recovery = routed.length
+        }
+        if (this.seed !== undefined && this.rules.routes !== false) this.offers = routeOffers(this.schedule, this.seed, state.wave)
         for (const unit of state.defenders) {
           unit.hp = profile(unit).hp
           unit.x = this.layout.slots[unit.slot]

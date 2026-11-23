@@ -1,6 +1,6 @@
 # Riftfront: Ages Under Siege
 
-Form a three-lane garrison, survive ten assaults, and kill the Rift Colossus before it reaches the core. Each wave starts when you give the order. Review the incoming lineup and prepare for the threats that matter in each lane.
+Form a three-lane garrison, survive ten assaults, and kill the Rift Colossus before it reaches the core. Each wave starts when you give the order. Review the incoming lineup and prepare for the threats that matter in each lane. Enter a siege seed at the briefing to replay its offers, or choose **New seed** to generate another campaign.
 
 ## Briefing and debrief
 
@@ -11,10 +11,11 @@ Review the Unit Collection for recruit costs, roles, combat stats, and available
 - Begin in the Ember Age with 128 scrap and 100 core integrity. Each lane has seven pads. The core is on the left and the rifts are on the right.
 - Recruit a defender, then select an empty pad. Hover or focus the pad to preview forward reach, including a melee defender’s advance. Inspect an occupied pad to see its stats and orders.
 - Guards and their retrofits advance toward live enemies within a fixed leash. Ranged damage dealers can step forward a little to acquire a target. Closest enemies normally take priority. Enemy melee stops at the first reachable defender, while ranged enemies can engage from farther out.
-- Routed defenders lose their contribution for the wave. After a successful defense, all defenders rally to their pads at full health. Core damage persists. A battle that reaches 35 seconds enters overtime. Enemies deal 8 more damage per hit, rising by another 8 every five seconds until the wave resolves.
+- Routed defenders go to reserve after a successful defense. Rest them for one wave or spend 18 scrap to make them ready immediately. Survivors rally to their pads at full health. Core damage persists. A battle that reaches 35 seconds enters overtime. Enemies deal 8 more damage per hit, rising by another 8 every five seconds until the wave resolves.
 - Kills and wave grants pay scrap. Later kills pay smaller bounties as the enemy count rises. A surviving Scavenger pays 11 scrap per completed wave, with a match limit of two Scavengers. Battle duration does not change salvage.
-- Redeploy a defender to an open pad for 8 scrap, including across lanes. Retiring returns one third of the base recruit price, rounded down. Upgrade spending has no resale value. Fused defenders have no resale value.
+- Redeploy a defender to an open pad for free, including across lanes. Send a defender to reserve from its inspector, then choose it in the reserve list to deploy it to an empty pad. Retiring returns one third of the base recruit price, rounded down. Upgrade spending has no resale value. Fused defenders have no resale value.
 - Starting at wave 4, advancing to the Coil Age costs 36 scrap and unlocks Coilcasters, Guard and Archer retrofits, Ash Mortar, and composite upgrades. Anchor Frame, Spark Relay, and Hush Battery are available in Ember. You can delay the purchase to reinforce a lane first.
+- Active garrison capacity is eight through wave 4, nine through wave 7, and eleven afterward. Scavengers count toward capacity and only pay while deployed and surviving. Fusion frees a place.
 - The wave report lists defeated enemies, routed defenders, synergy-boosted actions, scrap by source, and core damage by lane. It identifies the first routing and breach sources in each lane and highlights marked hits and charge counters. Pause stops the simulation and its combat animations. The 2× toggle advances the same fixed ticks faster. Sound is optional.
 
 ## Defenders
@@ -58,6 +59,14 @@ During planning, place the unupgraded inputs on consecutive pads in one lane. In
 - **Spark Link** grants +5 damage to a ranged attacker on either adjacent pad in the same lane as a Spark Relay while within 175 units. Each attacker receives at most one bonus. Ranged damage and splash use the bonus before armor.
 - Lines between linked defenders show the current formation bonuses. Links require both defenders alive and follow current combat reach. On the boss wave, leaving a spare pad between the frontline and fragile support can keep the support outside a blast. Check the actual position of your leashed interceptor.
 
+## Fronts and rewards
+
+After waves 2, 4, 6, and 8, pick a two-wave front. Both cards show the extra enemy groups, affected lanes, and reward. The selected forecast shows the complete encounter. Clear the first wave of the front to earn its reward.
+
+- **Broken ranks** grants 26 scrap. **Relief march** restores up to 20 core.
+- **Crossfire**, **Armor column**, and **Fast breach** award shield, precision, and Foundry credit respectively. Each credit discounts one eligible evolution or fusion by up to 44 scrap. The inspector shows the discounted price. Completing the order spends the credit, including any unused value.
+- The last chosen front contributes an escort to the Colossus fight. The center's light rush arrives after the Colossus has entered the field.
+
 ## The siege
 
 | Enemy | Pressure |
@@ -69,7 +78,7 @@ During planning, place the unupgraded inputs on consecutive pads in one lane. In
 | Herald | Gives nearby allies 5 armor. The aura is visible around it. Longshot or armor exposure can keep its escorts from stalling a lane. |
 | Rift Colossus | The final center-lane boss. Marks a circular area before a crushing blast. Spread support behind the line and reserve a way through its plate. An unblocked Colossus destroys the core. |
 
-The first assault sends five Raiders in a tight pack down lane 1 and three staggered Raiders down lane 2. The first two waves grant 51 and 48 scrap on clear. Wave 5 grants 56. Bounties and Scavenger payouts follow their normal rules.
+The first assault sends five Raiders in a tight pack down lane 1 and three staggered Raiders down lane 2. The first two waves grant 51 and 42 scrap on clear. Wave 5 grants 50 before any route reward. Bounties taper from wave 5. Surviving and deployed Scavengers still earn 11 scrap per clear.
 
 - **Wave 2** opens lane 3 with a Skitter pack and follows with a delayed lane 1 rush while Raiders trickle into lane 2.
 - **Wave 3** sends a marked Ram down lane 1 ahead of its Raider escort. Its first impact has a visible 160-unit radius. Anchor Frame can cancel the charge, and Wardkeeper can absorb the charge as its target without taking the charge bonus. The blast can still strike nearby allies when Wardkeeper braces.

@@ -21,6 +21,11 @@
         <span class="subtitle">Campaign briefing</span>
         <h1 id="brief-title">Hold the<br>Ember Gorge</h1>
         <p>Build a garrison across three lanes, endure ten assaults, and stop the Rift Colossus before it reaches the core.</p>
+        <div class="seed-controls">
+          <label for="run-seed">Siege seed</label>
+          <input id="run-seed" type="number" min="0" max="4294967295" step="1" required>
+          <button id="new-seed">New seed</button>
+        </div>
         <div class="actions">
           <button id="play" class="primary">Begin siege <span aria-hidden="true">→</span></button>
           <button id="review-army">Review defenders</button>
@@ -39,6 +44,7 @@
           <div class="core-stat"><span>Core integrity</span><strong id="core"></strong><progress id="core-meter" aria-label="Core integrity"></progress></div>
           <div><span>Scrap</span><strong id="scrap"></strong></div>
           <div><span>Wave</span><strong id="wave"></strong></div>
+          <div><span>Garrison</span><strong id="capacity"></strong></div>
           <div><span>Era</span><strong id="era"></strong></div>
         </div>
         <div class="actions">
@@ -62,6 +68,10 @@
           <section class="workbench" aria-label="Formation orders">
             <div class="order-heading"><h2>Formation</h2><p id="feedback" role="status"></p></div>
             <div id="units" role="group" aria-label="Recruit defenders"></div>
+            <section id="reserve" hidden>
+              <h3>Reserve</h3>
+              <div id="reserve-orders" class="actions"></div>
+            </section>
           </section>
         </div>
         <aside class="intel" aria-label="Wave intelligence">
@@ -80,18 +90,24 @@
               <ul id="fusion-stats" class="stat-list"></ul></div>
               <button id="confirm-fusion"></button>
             </div>
-            <div class="actions"><button id="fuse"></button><button id="move"></button><button id="retire"></button></div>
+            <div class="actions"><button id="fuse"></button><button id="move"></button><button id="bench">Send to reserve</button><button id="retire"></button></div>
           </div>
-          <section>
+          <section id="route" hidden>
+            <h2>Choose the next front</h2>
+            <p>Two waves per front. Earn the reward after the first clear.</p>
+            <div id="route-options"></div>
+          </section>
+          <section id="forecast-panel">
             <span id="intel-heading" class="subtitle"></span>
             <h2 id="wave-title"></h2>
+            <p id="run-details"></p>
             <p id="tip"></p>
             <ul id="forecast"></ul>
             <details id="threats"><summary>Enemy abilities</summary><div id="threat-list"></div></details>
           </section>
           <section id="report" hidden>
             <h2 id="report-heading"></h2>
-            <p id="report-damage"></p><p id="report-losses"></p><p id="report-incidents" hidden></p><p id="report-economy"></p>
+            <p id="report-damage"></p><p id="report-losses"></p><p id="report-incidents" hidden></p><p id="report-economy"></p><p id="report-campaign"></p>
           </section>
         </aside>
 
