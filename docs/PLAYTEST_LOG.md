@@ -29,3 +29,15 @@ The strategic redesign specification records the owner's first-attempt clear wit
 ### Early economy pressure
 
 Pending human session. Use control `cb49d71` and candidate `3b4dec5` with their fixed encounters. Record unaided lane forecasts, opening purchases and placements, explanations of any breaches, recovery purchases for waves 2 and 3, and the opening the player would try next. See the [paired comparison and playtest questions](BALANCE_REPORT.md#findings-and-playtest-gate).
+
+### Combat and strategy vertical slice
+
+Pending human session and owner decision. Use control `6fe17f6` and `experiment/combat-strategy-slice`. Run `npm run dev` in each checkout and choose **Begin siege**. Play waves 1–5 or until defeat, once per build, using only in-game information. If testing with multiple players, alternate which build they see first. Before each wave, write down the threat, the order you considered but skipped, and the defender or lane you think is most at risk. After each wave, record core, routes, and your explanation before checking the report.
+
+Then replay the candidate. If the first run used an Archer, try a Cinder Lobber in lane 1 or an Anchor Frame with a Guard in lane 2. If the first run spent heavily on defense, try two Guards with a Scavenger on the rearmost lane 2 pad and recover after the opening. Try leaving a pad between lane 1's front and ranged support for the Ram, then compare closer support against the aimed Spitters. Continue one successful run through wave 10 to check the handoff.
+
+1. Which purchase did you most want but defer, and where did you feel the cost?
+2. Which defender did you expect to be in danger, and could you explain the first route or breach after combat?
+3. Which build would you voluntarily try next, and what do you expect it to handle better?
+
+Record the decision after the session. See the [paired comparison](BALANCE_REPORT.md#combat-and-strategy-vertical-slice).

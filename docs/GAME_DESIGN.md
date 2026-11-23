@@ -15,7 +15,7 @@ Review the Unit Collection for recruit costs, roles, combat stats, and available
 - Kills and wave grants pay scrap. Later kills pay smaller bounties as the enemy count rises. A surviving Scavenger pays 11 scrap per completed wave, with a match limit of two Scavengers. Battle duration does not change salvage.
 - Redeploy a defender to an open pad for 8 scrap, including across lanes. Retiring returns one third of the base recruit price, rounded down. Upgrade spending has no resale value. Fused defenders have no resale value.
 - Starting at wave 4, advancing to the Coil Age costs 36 scrap and unlocks Coilcasters, Guard and Archer retrofits, Ash Mortar, and composite upgrades. Anchor Frame, Spark Relay, and Hush Battery are available in Ember. You can delay the purchase to reinforce a lane first.
-- The wave report lists defeated enemies, routed defenders, synergy-boosted actions, scrap by source, and core damage by lane. Pause stops the simulation and its combat animations. The 2× toggle advances the same fixed ticks faster. Sound is optional.
+- The wave report lists defeated enemies, routed defenders, synergy-boosted actions, scrap by source, and core damage by lane. It identifies the first routing and breach sources in each lane and highlights marked hits and charge counters. Pause stops the simulation and its combat animations. The 2× toggle advances the same fixed ticks faster. Sound is optional.
 
 ## Defenders
 
@@ -36,7 +36,7 @@ Review the Unit Collection for recruit costs, roles, combat stats, and available
 | Guard | Vanguard | 48 | Longer advance and sweeping melee hits. Clears clusters quickly and risks moving beyond support. |
 | Archer | Volley | 47 | Fast fire punishes light enemies or targets exposed by a Coilcaster. |
 | Archer | Longshot | 47 | Heavy shots pierce 12 armor and prioritize the enemy with the highest maximum health in range. |
-| Foundry Chassis | Anchor Frame | 43 | Ember. Armored short-leash blocker with slowing strikes. |
+| Foundry Chassis | Anchor Frame | 43 | Ember. Armored short-leash blocker whose slowing strikes interrupt marked Ram charges. |
 | Foundry Chassis | Spark Relay | 31 | Ember. Stationary ranged support that gives up its attack. Put it between two ranged allies for maximum coverage. |
 | Foundry Chassis | Ash Mortar | 54 | Coil. Fragile, long-range artillery with wide, slow blasts. |
 | Saboteur | Hush Battery | 38 | Ember. Suppresses every Herald hit by each shell, with gaps between shots. |
@@ -51,7 +51,7 @@ During planning, place the unupgraded inputs on consecutive pads in one lane. In
 
 | Forward defender | Adjacent defender behind | Fee | Result |
 | --- | --- | ---: | --- |
-| Guard | Mender | 23 | **Wardkeeper** intercepts while independently repairing the most wounded other ally within 270 units. Keep separate units for longer healing reach and Field Dressing. |
+| Guard | Mender | 23 | **Wardkeeper** intercepts, braces against the bonus damage of a marked Ram charge directed at it, and independently repairs the most wounded other ally within 270 units. Keep separate units for longer healing reach and Field Dressing. |
 | Archer | Coilcaster | 18 | **Arc Ranger** fires piercing shots at the toughest enemy, slows it and exposes its armor. Keep both inputs to apply damage and exposure independently. |
 
 - **Field Dressing** adds up to 8 HP to a Mender's heal on a Guard, Bastion, or Vanguard when the Mender occupies the immediately rearward pad in the same lane and the Guard is within healing range.
@@ -69,7 +69,14 @@ During planning, place the unupgraded inputs on consecutive pads in one lane. In
 | Herald | Gives nearby allies 5 armor. The aura is visible around it. Longshot or armor exposure can keep its escorts from stalling a lane. |
 | Rift Colossus | The final center-lane boss. Marks a circular area before a crushing blast. Spread support behind the line and reserve a way through its plate. An unblocked Colossus destroys the core. |
 
-The first assault sends five Raiders in a tight pack down lane 1 and three staggered Raiders down lane 2. Wave 2 introduces clustered Skitter rushes, followed by single armored threats and ranged fire. Protected armor, sustained ranged waves, and a heavily contested center follow. The final assault sends the Colossus through the center while the outer lanes face separate attacks.
+The first assault sends five Raiders in a tight pack down lane 1 and three staggered Raiders down lane 2. The first two waves grant 51 and 48 scrap on clear. Wave 5 grants 56. Bounties and Scavenger payouts follow their normal rules.
+
+- **Wave 2** opens lane 3 with a Skitter pack and follows with a delayed lane 1 rush while Raiders trickle into lane 2.
+- **Wave 3** sends a marked Ram down lane 1 ahead of its Raider escort. Its first impact has a visible 160-unit radius. Anchor Frame can cancel the charge, and Wardkeeper can absorb the charge as its target without taking the charge bonus. The blast can still strike nearby allies when Wardkeeper braces.
+- **Wave 4** puts two marked Spitters in lane 1. Each opens with one aimed shot once it reaches normal firing range of a defender. It marks the rearmost defender within 420 units, and killing the Spitter during windup cancels the shot. Its later attacks use normal targeting. Coil Age becomes available.
+- **Wave 5** overlaps Heralds and armored escorts in lane 3 while lane 1 faces a swarm. The aura ring disappears when a Saboteur suppresses the Herald.
+
+Protected armor, sustained ranged waves, and a heavily contested center follow. The final assault sends the Colossus through the center while the outer lanes face separate attacks.
 
 ## Implementation and verification
 

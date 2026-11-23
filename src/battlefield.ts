@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser'
-import { CORE_HP, CORE_X, ENEMIES, ENTRY_X, OVERTIME_TICK, STEP_MS, WIDTH, profile } from './sim/data'
+import { CORE_HP, CORE_X, ENEMIES, ENTRY_X, OVERTIME_TICK, STEP_MS, SIEGE_ATTACKS, WIDTH, profile } from './sim/data'
 import type { Effect, Match, Phase } from './sim/match'
 import { drawArena } from './field-art'
 import type { BattleSound } from './sound'
@@ -22,7 +22,7 @@ export class Battlefield extends Phaser.Scene {
   private points = new Map<number, Point>()
   private lunges = new Map<number, { start: number; direction: number }>()
   private flashes = new Map<number, number>()
-  private effects: { effect: Effect; age: number }[] = []
+  private effects: { effect: Exclude<Effect, { type: 'counter' }>; age: number }[] = []
 
   constructor(
     private readonly match: () => Match,
@@ -112,6 +112,10 @@ export class Battlefield extends Phaser.Scene {
   }
 
   private present(effect: Effect) {
+    if (effect.type === 'counter') {
+      this.floatLabel(effect.x, effect.lane, effect.action === 'brace' ? 'Braced' : 'Charge stopped', '#c1fb9b')
+      return
+    }
     this.effects.push({ effect, age: 0 })
     this.audio.play(effect)
     if (effect.type === 'breach' || effect.type === 'blast') {
@@ -126,10 +130,15 @@ export class Battlefield extends Phaser.Scene {
     }
     if (!breach && !heal && effect.amount < 20) return
     const x = breach ? CORE_X : effect.to
-    const y = this.match().layout.lanes[effect.lane] - (breach ? 57 : 46)
-    const label = this.add.text(x, y, `${heal ? '+' : '−'}${effect.amount}`, {
+    this.floatLabel(x, effect.lane, `${heal ? '+' : '−'}${effect.amount}`,
+      heal ? '#c1fb9b' : breach ? '#ff8f87' : '#fff4df', breach)
+  }
+
+  private floatLabel(x: number, lane: number, text: string, color: string, breach = false) {
+    const y = this.match().layout.lanes[lane] - (breach ? 57 : 46)
+    const label = this.add.text(x, y, text, {
       fontFamily: 'system-ui', fontSize: breach ? '27px' : '19px', fontStyle: 'bold',
-      color: heal ? '#c1fb9b' : breach ? '#ff8f87' : '#fff4df', stroke: '#201826', strokeThickness: 5,
+      color, stroke: '#201826', strokeThickness: 5,
     }).setOrigin(.5).setDepth(31)
     this.damageText.push({ label, age: 0, start: y })
   }
@@ -162,11 +171,16 @@ export class Battlefield extends Phaser.Scene {
     }
     for (const enemy of state.enemies) {
       const def = ENEMIES[enemy.kind]
-      if (enemy.pulseX !== undefined && def.pulse) {
+      const markedTarget = enemy.siege === 'snipe' && enemy.mark
+        ? state.defenders.find(unit => unit.id === enemy.mark?.target && unit.hp > 0)
+        : undefined
+      const markX = enemy.siege === 'snipe' ? markedTarget && this.x(markedTarget) : enemy.mark?.x ?? enemy.pulseX
+      const radius = enemy.mark && enemy.siege ? SIEGE_ATTACKS[enemy.siege].radius : def.pulse?.radius
+      if (markX !== undefined && radius !== undefined) {
         const y = lanes[enemy.lane]
         const intensity = .3 + .25 * Math.sin(this.clock / 70)
-        g.fillStyle(0xfc4d70, intensity).fillEllipse(enemy.pulseX, y + 7, def.pulse.radius * 2, 86)
-        g.lineStyle(4, 0xffa788, .85).strokeEllipse(enemy.pulseX, y + 7, def.pulse.radius * 2, 86)
+        g.fillStyle(0xfc4d70, intensity).fillEllipse(markX, y + 7, radius * 2, 86)
+        g.lineStyle(4, 0xffa788, .85).strokeEllipse(markX, y + 7, radius * 2, 86)
       }
       if (def.aura && !enemy.disrupted) g.lineStyle(2, def.color, .28).strokeEllipse(this.x(enemy), lanes[enemy.lane] + 11, def.aura * 2, 61)
     }
@@ -192,7 +206,7 @@ export class Battlefield extends Phaser.Scene {
       const def = ENEMIES[unit.kind]
       const y = lanes[unit.lane] + (unit.kind === 'colossus' ? 0 : (unit.id % 5 - 2) * 5)
       const x = this.x(unit)
-      this.drawActor(visible, unit.id, unit.kind, x, y, -1, unit.pulseX !== undefined)
+      this.drawActor(visible, unit.id, unit.kind, x, y, -1, unit.pulseX !== undefined || unit.mark !== undefined)
       this.health(x, y - (unit.kind === 'colossus' ? 111 : 67), unit.hp / def.hp, def.color, unit.kind === 'colossus' ? 90 : 42)
       if (unit.disrupted) g.lineStyle(3, 0xff9edc, .8).lineBetween(x - 10, y - 55, x + 10, y - 42)
       if (unit.slow) g.lineStyle(3, 0x9cddff, .68).strokeEllipse(x, y + 19, 51, 15)

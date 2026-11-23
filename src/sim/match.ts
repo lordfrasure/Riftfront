@@ -2,8 +2,8 @@ import { formationLinks, fusionRecipe } from './formation.js'
 import { applyDamage, selectTarget, type Combatant } from './combat.js'
 import {
   ARMOR_EXPOSURE, CORE_HP, CORE_X, DEFENDERS, ENEMIES, ENTRY_X, ERAS, HERALD_ARMOR, LAYOUTS, SALVAGE_PAYOUT, SCAVENGER_LIMIT,
-  OVERTIME_DAMAGE, OVERTIME_RAMP, OVERTIME_TICK, SYNERGIES, STARTING_SCRAP, STEP_MS, UPGRADES, WAVES, profile,
-  type Attack, type DefenderKind, type EnemyKind, type Layout, type Era, type Lane, type Slot, type UpgradeKind, type Wave,
+  OVERTIME_DAMAGE, OVERTIME_RAMP, OVERTIME_TICK, SYNERGIES, STARTING_SCRAP, STEP_MS, SIEGE_ATTACKS, UPGRADES, WAVES, profile,
+  type Attack, type DefenderKind, type EnemyKind, type Layout, type Era, type Lane, type Slot, type SiegeAttack, type UpgradeKind, type Wave,
 } from './data.js'
 
 export const REDEPLOY_COST = 8
@@ -17,9 +17,22 @@ export interface Enemy extends Combatant {
   charged: boolean
   pulseAt: number
   pulseX?: number
+  siege?: SiegeAttack
+  mark?: Readonly<{ x: number; at: number; target: number }>
+}
+
+interface CombatIncident {
+  readonly tick: number
+  readonly lane: Lane
+  readonly enemy: EnemyKind
+  readonly action: 'strike' | 'impact' | 'snipe' | 'pulse' | 'breach' | 'interrupt' | 'brace'
+  readonly defender?: string
+  readonly amount?: number
+  readonly routed?: boolean
 }
 
 interface WaveReport {
+  incidents: CombatIncident[]
   wave: number
   ticks: number
   kills: number
@@ -48,6 +61,7 @@ export type Effect =
   | { type: 'fall'; id: number; lane: Lane; x: number; color: number }
   | { type: 'blast'; lane: Lane; x: number; radius: number }
   | { type: 'breach'; lane: Lane; amount: number }
+  | { type: 'counter'; lane: Lane; x: number; action: 'interrupt' | 'brace' }
 
 export class Match {
   private state = {
@@ -76,7 +90,8 @@ export class Match {
       Number.isInteger(slot) && slot >= 0 && slot < this.layout.slots.length
   }
 
-  get lastWave(): (Readonly<Omit<WaveReport, 'coreDamage' | 'damage'>> & {
+  get lastWave(): (Readonly<Omit<WaveReport, 'coreDamage' | 'damage' | 'incidents'>> & {
+    readonly incidents: readonly CombatIncident[]
     readonly coreDamage: readonly number[]
     readonly damage: Readonly<WaveReport['damage']>
   }) | undefined {
@@ -98,7 +113,7 @@ export class Match {
         state.tick = 0
         state.spawned = 0
         this.activeReport = {
-          wave: state.wave, ticks: 0, kills: 0, bounty: 0, income: 0, losses: 0,
+          incidents: [], wave: state.wave, ticks: 0, kills: 0, bounty: 0, income: 0, losses: 0,
           clearBonus: 0, coreDamage: this.layout.lanes.map(() => 0), synergyActions: 0, damage: {},
         }
         state.phase = 'battle'
@@ -187,8 +202,8 @@ export class Match {
     const wave = this.waves[state.wave - 1]
     report.ticks = ++state.tick
     while (state.spawned < wave.spawns.length && wave.spawns[state.spawned].tick <= state.tick) {
-      const { lane, kind } = wave.spawns[state.spawned++]
-      state.enemies.push({ id: this.nextId++, kind, lane, x: ENTRY_X, hp: ENEMIES[kind].hp, cooldown: 0,
+      const { lane, kind, siege } = wave.spawns[state.spawned++]
+      state.enemies.push({ id: this.nextId++, kind, lane, siege, x: ENTRY_X, hp: ENEMIES[kind].hp, cooldown: 0,
         charged: false, slow: 0, expose: 0, disrupted: 0, pulseAt: state.tick + 35 })
     }
 
@@ -265,6 +280,13 @@ export class Match {
       if (attack.disrupt && ENEMIES[enemy.kind].aura) enemy.disrupted = attack.disrupt
       if (attack.expose) enemy.expose = ARMOR_EXPOSURE.ticks
       if (attack.slow) enemy.slow = attack.slow
+      if (unit.upgrade === 'bulwark' && enemy.siege === 'impact' && (!enemy.charged || enemy.mark) && enemy.hp > 0) {
+        enemy.mark = undefined
+        enemy.charged = true
+        effects.push({ type: 'counter', lane: unit.lane, x: unit.x, action: 'interrupt' })
+        report.incidents.push({ tick: this.state.tick, lane: enemy.lane, enemy: enemy.kind,
+          action: 'interrupt', defender: profile(unit).label })
+      }
       if (enemy === target) effects.push({ type: 'hit', lane: unit.lane, from: unit.x, to: enemy.x,
         source: unit.id, target: enemy.id, style, amount: before - enemy.hp, splash: attack.splash, color })
       if (enemy.hp === 0) {
@@ -309,12 +331,13 @@ export class Match {
     const stride = definition.speed * STEP_MS / 1000 * (enemy.slow > 0 ? .55 : 1)
     enemy.slow = Math.max(0, enemy.slow - 1)
     const target = selectTarget(enemy, state.defenders, attack.range + stride, -1)
+    if (enemy.siege && this.actSiegeAttack(enemy, enemy.siege, target, rage, report, effects)) return
     if (pulse && enemy.pulseX !== undefined) {
       if (state.tick < enemy.pulseAt) return
       effects.push({ type: 'blast', lane: enemy.lane, x: enemy.pulseX, radius: pulse.radius })
       for (const unit of state.defenders) {
         if (unit.lane === enemy.lane && unit.hp > 0 && Math.abs(unit.x - enemy.pulseX) <= pulse.radius) {
-          this.damageDefender(unit, pulse.damage + rage, report, effects)
+          this.damageDefender(unit, pulse.damage + rage, report, effects, enemy, 'pulse')
         }
       }
       enemy.pulseX = undefined
@@ -336,7 +359,7 @@ export class Match {
       const charge = enemy.charged ? 0 : definition.charge ?? 0
       enemy.charged = true
       enemy.cooldown = attack.cooldown
-      const amount = this.damageDefender(target, attack.damage + charge + rage, report, effects)
+      const amount = this.damageDefender(target, attack.damage + charge + rage, report, effects, enemy, 'strike')
       effects.push({ type: 'hit', lane: enemy.lane, from: enemy.x, to: target.x, source: enemy.id, target: target.id,
         style: attack.range > 70 ? 'acid' : 'strike', amount, color })
       return
@@ -346,14 +369,65 @@ export class Match {
       const amount = Math.min(state.core, definition.breach)
       state.core -= amount
       report.coreDamage[enemy.lane] += amount
+      report.incidents.push({ tick: state.tick, lane: enemy.lane, enemy: enemy.kind, action: 'breach', amount })
       effects.push({ type: 'breach', lane: enemy.lane, amount })
     }
   }
 
-  private damageDefender(unit: Defender, damage: number, report: WaveReport, effects: Effect[]) {
+  private actSiegeAttack(enemy: Enemy, siege: SiegeAttack, front: Defender | undefined, rage: number,
+    report: WaveReport, effects: Effect[]) {
+    const { tick, defenders } = this.state
+    const definition = ENEMIES[enemy.kind]
+    const mark = enemy.mark
+    if (mark) {
+      if (tick < mark.at) return true
+      enemy.mark = undefined
+      enemy.cooldown = definition.attack.cooldown
+      if (siege === 'impact') {
+        effects.push({ type: 'blast', lane: enemy.lane, x: mark.x, radius: SIEGE_ATTACKS.impact.radius })
+        for (const unit of defenders) {
+          if (unit.hp <= 0 || unit.lane !== enemy.lane || Math.abs(unit.x - mark.x) > SIEGE_ATTACKS.impact.radius) continue
+          const braces = unit.id === mark.target && unit.kind === 'wardkeeper'
+          const damage = definition.attack.damage + (braces ? 0 : definition.charge ?? 0) + rage
+          if (braces) {
+            effects.push({ type: 'counter', lane: unit.lane, x: unit.x, action: 'brace' })
+            report.incidents.push({ tick, lane: enemy.lane, enemy: enemy.kind,
+              action: 'brace', defender: profile(unit).label })
+          }
+          this.damageDefender(unit, damage, report, effects, enemy, siege)
+        }
+      } else {
+        const target = defenders.find(unit => unit.id === mark.target && unit.hp > 0)
+        if (target) {
+          const amount = this.damageDefender(target, SIEGE_ATTACKS.snipe.damage + rage, report, effects, enemy, siege)
+          effects.push({ type: 'hit', lane: enemy.lane, from: enemy.x, to: target.x, source: enemy.id,
+            target: target.id, style: 'acid', amount, color: definition.color })
+        }
+      }
+      return true
+    }
+
+    if (enemy.cooldown || enemy.charged || !front) return false
+    const focus = siege === 'impact'
+      ? front
+      : defenders.filter(unit => unit.hp > 0 && unit.lane === enemy.lane &&
+          unit.x <= enemy.x && enemy.x - unit.x <= SIEGE_ATTACKS.snipe.reach)
+        .reduce<Defender | undefined>((rear, unit) => !rear || unit.x < rear.x ? unit : rear, undefined)
+    if (!focus) return false
+    enemy.mark = { x: focus.x, at: tick + SIEGE_ATTACKS[siege].windup, target: focus.id }
+    enemy.charged = true
+    return true
+  }
+
+  private damageDefender(unit: Defender, damage: number, report: WaveReport, effects: Effect[],
+    enemy: Enemy, action: CombatIncident['action']) {
     const before = unit.hp
     const definition = profile(unit)
     applyDamage(unit, damage, definition.armor)
+    if (unit.hp === 0 || action === 'impact' || action === 'snipe') {
+      report.incidents.push({ tick: this.state.tick, lane: unit.lane, enemy: enemy.kind,
+        action, defender: definition.label, amount: before - unit.hp, routed: unit.hp === 0 })
+    }
     if (unit.hp === 0) {
       report.losses++
       effects.push({ type: 'fall', id: unit.id, lane: unit.lane, x: unit.x, color: definition.color })

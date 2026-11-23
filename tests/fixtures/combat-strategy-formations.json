@@ -1,0 +1,114 @@
+{
+  "archerAdjacent": {
+    "orders": {
+      "1": [
+        {
+          "type": "place",
+          "kind": "guard",
+          "lane": 0,
+          "slot": 3
+        },
+        {
+          "type": "place",
+          "kind": "archer",
+          "lane": 0,
+          "slot": 2
+        }
+      ]
+    }
+  },
+  "archerSpaced": {
+    "orders": {
+      "1": [
+        {
+          "type": "place",
+          "kind": "guard",
+          "lane": 0,
+          "slot": 3
+        },
+        {
+          "type": "place",
+          "kind": "archer",
+          "lane": 0,
+          "slot": 1
+        }
+      ]
+    }
+  },
+  "anchor": {
+    "orders": {
+      "1": [
+        {
+          "type": "place",
+          "kind": "chassis",
+          "lane": 0,
+          "slot": 3
+        },
+        {
+          "type": "upgrade",
+          "id": 1,
+          "upgrade": "bulwark"
+        },
+        {
+          "type": "place",
+          "kind": "archer",
+          "lane": 0,
+          "slot": 2
+        }
+      ]
+    }
+  },
+  "wardkeeper": {
+    "orders": {
+      "1": [
+        {
+          "type": "place",
+          "kind": "guard",
+          "lane": 0,
+          "slot": 3
+        },
+        {
+          "type": "place",
+          "kind": "mender",
+          "lane": 0,
+          "slot": 2
+        },
+        {
+          "type": "fuse",
+          "first": 1,
+          "second": 2
+        },
+        {
+          "type": "place",
+          "kind": "chassis",
+          "lane": 0,
+          "slot": 1
+        }
+      ]
+    }
+  },
+  "separate": {
+    "orders": {
+      "1": [
+        {
+          "type": "place",
+          "kind": "guard",
+          "lane": 0,
+          "slot": 3
+        },
+        {
+          "type": "place",
+          "kind": "mender",
+          "lane": 0,
+          "slot": 2
+        },
+        {
+          "type": "place",
+          "kind": "chassis",
+          "lane": 0,
+          "slot": 1
+        }
+      ]
+    }
+  }
+}

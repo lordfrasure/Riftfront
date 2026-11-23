@@ -310,6 +310,31 @@ function updateIntel() {
   const damage = report.coreDamage.flatMap((amount, lane) => amount ? [`Lane ${lane + 1} −${amount}`] : [])
   element('report-damage').textContent = damage.length ? `Core breached · ${damage.join(' / ')}` : 'Core held in every lane.'
   element('report-losses').textContent = `${report.kills} defeated · ${report.losses} routed · ${report.synergyActions} boosted actions`
+  const incidents = report.incidents
+  const highlights = match.layout.lanes.flatMap((_, lane) => {
+    const firstBreach = incidents.find(event => event.lane === lane && event.action === 'breach')
+    const firstRoute = incidents.find(event => event.lane === lane && event.routed)
+    const counter = incidents.find(event => event.lane === lane &&
+      (event.action === 'interrupt' || event.action === 'brace'))
+    const details: string[] = []
+    if (firstRoute) {
+      const source = ENEMIES[firstRoute.enemy].label
+      const ability = { impact: ' charge', snipe: ' aimed shot', pulse: ' blast' }
+      const suffix = firstRoute.action === 'impact' || firstRoute.action === 'snipe' || firstRoute.action === 'pulse'
+        ? ability[firstRoute.action] : ''
+      details.push(`${source}${suffix} routed ${firstRoute.defender}`)
+    }
+    const markedHit = incidents.find(event => event.lane === lane &&
+      (event.action === 'impact' || event.action === 'snipe'))
+    if (!firstRoute && markedHit) details.push(
+      `${ENEMIES[markedHit.enemy].label} hit ${markedHit.defender} (−${markedHit.amount})`)
+    if (firstBreach) details.push(`${ENEMIES[firstBreach.enemy].label} breached first (−${firstBreach.amount})`)
+    if (counter) details.push(counter.action === 'interrupt'
+      ? `${counter.defender} stopped the charge` : `${counter.defender} braced for impact`)
+    return details.length ? [`Lane ${lane + 1} · ${details.join('. ')}.`] : []
+  })
+  element('report-incidents').hidden = highlights.length === 0
+  element('report-incidents').textContent = highlights.join(' ')
   element('report-economy').textContent = `+${report.bounty} bounty · +${report.income} salvage · +${report.clearBonus} grant`
 }
 

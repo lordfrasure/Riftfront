@@ -62,12 +62,13 @@ function trial(strategy, layout, schedule) {
       orders.push({ ...order, cost, ...(error ? { error } : {}) })
       return error
     }
-    if (strategy.opening) plan(match, strategy, dispatch)
+    if (strategy.opening && (wave === 1 || !strategy.ordersBeforeFollowup)) plan(match, strategy, dispatch)
     for (const order of strategy.orders?.[wave] ?? []) {
       if (order.type === 'start') throw Error('The laboratory starts each wave automatically.')
       const error = dispatch(order)
       if (error) throw Error(`Wave ${wave}: ${JSON.stringify(order)}: ${error}`)
     }
+    if (strategy.opening && wave > 1 && strategy.ordersBeforeFollowup) plan(match, strategy, dispatch)
     const creatures = match.waves[wave - 1].spawns
     const formation = match.view.defenders.map(({ id, kind, lane, slot, upgrade }) => ({ id, kind, lane, slot, upgrade }))
     const byId = new Map(formation.map(unit => [unit.id, unit]))
@@ -143,11 +144,19 @@ function summarize(runs) {
 export function buildReport(args) {
   const { values } = parseArgs({ args, options: {
     lab: { type: 'boolean' }, json: { type: 'boolean' }, config: { type: 'string' },
-    layout: { type: 'string' }, seeds: { type: 'string' }, jitter: { type: 'string' },
+    layout: { type: 'string' }, wave: { type: 'string' }, lane: { type: 'string' }, seeds: { type: 'string' }, jitter: { type: 'string' },
   } })
   const layout = values.layout ?? 'seven'
   const geometry = Object.hasOwn(LAYOUTS, layout) && LAYOUTS[layout]
   const seeds = values.seeds === undefined ? [null] : values.seeds.split(',').map(value => value.trim() ? Number(value) : NaN)
+  const encounter = values.wave === undefined ? undefined : Number(values.wave)
+  if (encounter !== undefined && (!Number.isInteger(encounter) || !new Match().waves[encounter - 1])) {
+    throw Error('Use a valid campaign wave number.')
+  }
+  const lane = values.lane === undefined ? undefined : Number(values.lane) - 1
+  if (lane !== undefined && (encounter === undefined || !geometry || !Number.isInteger(lane) || !geometry.lanes[lane])) {
+    throw Error('Use a valid one-based lane with --wave.')
+  }
   const jitter = Number(values.jitter ?? (values.seeds === undefined ? 0 : 8))
   if (!geometry || new Set(seeds).size !== seeds.length ||
       seeds.some(seed => seed !== null && (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff)) ||
@@ -163,14 +172,17 @@ export function buildReport(args) {
     return [name, { ...baseline[preset], ...strategies[preset], ...overrides }]
   }))
   if (!Object.keys(policies).length) throw Error('Provide at least one policy.')
-  const scenarios = seeds.map(seed => ({
-    seed, schedule: scenarioWaves(geometry, seed, jitter) ?? new Match(geometry).waves,
-  }))
+  const scenarios = seeds.map(seed => {
+    const waves = scenarioWaves(geometry, seed, jitter) ?? new Match(geometry).waves
+    if (encounter === undefined) return { seed, schedule: waves }
+    const wave = waves[encounter - 1]
+    return { seed, schedule: [lane === undefined ? wave : { ...wave, spawns: wave.spawns.filter(spawn => spawn.lane === lane) }] }
+  })
   const reports = Object.entries(policies).map(([name, policy]) => {
     const runs = scenarios.map(scenario => ({ ...trial(policy, geometry, scenario.schedule), scenario }))
     return { name, policy, summary: summarize(runs), runs: runs.map(({ scenario, ...run }) => ({ seed: scenario.seed, ...run })) }
   })
-  return { format: values.json ? 'json' : 'table', report: { version: 1, layout, jitter, scenarios, reports } }
+  return { format: values.json ? 'json' : 'table', report: { version: 1, layout, jitter, encounter, lane, scenarios, reports } }
 }
 
 export function main(args) {

@@ -144,3 +144,52 @@ Wave 1 core damage and route counts matched the fixed run in all five seeds for 
 - **Verification.** All 21 tests passed. The production build passed with Vite's chunk-size warning. Chromium verified the forecast, placements, launch controls, and wave report on desktop at 1440 × 900 and touch at 390 × 844. The desktop lane 1 Scavenger run lost 24 core and routed two units. The touch Lobber run held every lane with zero routes.
 
 Ask players before launching which lane is most likely to break, whether they would invest in salvage, where they would place it, and what they would give up to reinforce. After combat, ask them to explain the breach or clean hold using the wave report and state what they would buy before wave 2. On replay, observe whether Archer, Lobber, a second Guard, banking, and safer salvage have credible use cases or whether the player always picks Archer. Record whether a 24-core loss felt predictable and whether the player could recover without coaching. Decision pending human playtest and project-owner approval.
+
+## Combat and strategy vertical slice
+
+Control `6fe17f6`. The candidate retains the concentrated Raider opening. The original `cb49d71` schedule cost an unsupported pair of Guards zero core across the previous comparison. A split arrival (three Raiders at ticks 1, 5, and 9, then two at 45 and 49) cost 16 core in each of the five seeds. The concentrated arrival cost 24. All three schedules used the same enemy counts, rewards, and follow-up. Archer and Lobber reinforcement kept 100 core in the opening across all three timings. Retaining the concentrated opening preserves the stronger tested investment risk. The split remains a way to reduce the opening tax if it feels disproportionate in play.
+
+The slice shifts eight scrap from each of the first two clear grants to wave 5, gives the second Skitter push to lane 1, marks a Ram charge in wave 3 and two aimed Spitter openers in wave 4, and overlaps the Herald escort in wave 5. Enemy counts, bounty rates, salvage rules, and late-wave schedules are held fixed. Anchor Frame melee reach increases from 44 to 49 so it can land a hit during the Ram's windup. Wardkeeper's brace only affects a marked charge aimed at it.
+
+### Reproduce
+
+Run the following on the candidate and with the candidate's lab and two fixtures copied into a checkout or archive of `6fe17f6`. Compile the control's own simulation. The isolated lane tests start with normal 128 scrap and deliberately omit other lanes to measure the selected formation without unrelated leaks ending the trial. Slots in fixtures are zero-based. `--wave` selects a campaign encounter to run as a single wave, and `--lane` optionally filters it by one-based lane. The `ordersBeforeFollowup` policy option reserves scrap for exact orders before the shared planner on waves after the opening.
+
+```sh
+npm run --silent balance -- --lab --config tests/fixtures/combat-strategy-slice.json --json
+npm run --silent balance -- --lab --config tests/fixtures/combat-strategy-slice.json --seeds 11,29,47,83,101 --jitter 8 --json
+npm run --silent balance -- --lab --wave 3 --lane 1 --config tests/fixtures/combat-strategy-formations.json --json
+npm run --silent balance -- --lab --wave 4 --lane 1 --config tests/fixtures/combat-strategy-formations.json --json
+```
+
+### Campaign results
+
+Fixed results through wave 5 or defeat. Arrows give control → candidate. Bank includes payouts. Spending is gross. The same fixture and planner run on each build. Policies start with 128 scrap and make different commitments. The follow-up uses the same rules, so guard coverage, available funds, swarm forecasts, and occupied pads change the actual purchases.
+
+| Policy | Core | Routes | Spent | Salvage | Bank | Campaign clears / core | Seeded wins / 5 |
+| --- | ---: | ---: | ---: | ---: | ---: | --- | ---: |
+| Conservative, Guard and Lobber | 100 | 1 | 500 → 508 | 0 | 168 → 160 | 10 / 100 | 5 |
+| Protected single salvage | 76 | 2 | 561 → 530 | 55 | 150 → 181 | 10 / 76 | 5 |
+| Aggressive double salvage | 7 → 0 | 12 → 9 | 510 → 252 | 66 → 11 | 178 → 59 | 6 / 0 → 2 / 0 | 0 |
+| Ranged, Guard and Archer into Coil | 100 | 0 → 2 | 498 → 490 | 0 | 170 → 178 | 10 / 100 | 5 |
+| Foundry, opening Anchor Frame | 100 | 0 | 528 → 489 | 0 | 140 → 179 | 10 / 100 | 5 |
+| Fusion, early Wardkeeper | 88 | 2 | 512 | 0 | 150 | 10 / 88 | 5 |
+| Ranged, rearward column map | 100 | 0 → 2 | 498 → 490 | 0 | 170 → 178 | 10 / 100 | 5 |
+| Mismatched, early Saboteur and no Lobber purchases | 29 | 6 | 489 → 450 | 0 | 144 → 183 | 5 / 0 | 0 |
+
+Seeded mean final core is identical to the fixed results except for fusion, which averages 89.2 on both builds. Double salvage entered candidate wave 3 at 32 core and was defeated by lane 1 and lane 3 breaches. Its route total covers only three encounters, including the failed wave. Protected salvage recovered with 76 core and one extra Scavenger payout per clear. By wave 5 it banked 21 more scrap than the conservative policy with 24 less core.
+
+Conservative and ranged both held at 100 through wave 5. The opening Lobber paid a ten-scrap premium but resolved wave 3 in 9.35 seconds versus 11.55 for ranged and took one fewer route on wave 4. Anchor Frame took 10.9 seconds to hold wave 1 versus 6.6 for the ranged opening, then interrupted the Ram at tick 42 on wave 3 and finished wave 5 without a route. Fusion spent 62 on the Mender and merge ahead of wave 2 coverage, leaked 12 core there, and braced on wave 3. The mismatched army first leaked on wave 2 and spent 45.2 seconds in wave 4. These are purchase-policy outcomes. The fixtures do not establish a dominant general strategy or a human win rate.
+
+### Formation results and limitations
+
+- **Wave 3, Ram lane.** Both 74-scrap Guard–Archer layouts hold on both builds. Candidate adjacency exposes the Archer to 31 splash damage and clears in 12.9 seconds. One empty pad avoids that hit and clears in 13.9 seconds. Both rally fully. The tactical trade is exposure versus acquisition time, with no persistent loss in this fixture.
+- **Wave 4, Spitter lane.** The same adjacent and spaced formations hold on both builds. On the control both finish with zero routes. On the candidate the adjacent Archer takes one aimed shot, kills a marked Spitter during windup and finishes with zero routes. The spaced Archer stays outside aim reach, so both shots hit the Guard and it routes. Across five timing seeds the control held at 100 with zero routes for both placements. On the candidate the adjacent Archer held at 100 with zero routes in two seeds, but two shots landed in the remaining three and the lane finished at 70 with two routes. The spaced pair held at 100 with one route in every seed. Anchor Frame and the adjacent Archer held at 100 with zero routes across all five, at a 39-scrap premium over the Guard pair. Pulling the whole policy rearward still changes clear times without changing campaign core or routes.
+- **Wave 3, specialization.** The 113-scrap Anchor Frame and Archer cancel the charge and hold. Wardkeeper plus Chassis spends 126, takes an 8-HP charge hit, and loses 17 core with two routes. Separate Guard, Mender and Chassis spend 103, take a 27-HP charge hit on the Guard, and also lose 17 core, with three routes. Both defense-only packages lack the damage to finish the Ram before overtime. Fusion trades 23 scrap and independent, longer-range healing for brace and a compact front.
+- **Open balance questions.** Several sensible policies still clear at 100. Foundry preserved core and spent least through wave 5 in the fixed comparison, while the ranged and Lobber plans had faster openings. Wave 5 resolved in 26.6 seconds for all six viable fixed policies under the common follow-up. That convergence leaves the Herald-specific purchase decision less well established than the early economy and placement decisions. The tighter economy mainly changes timing, and automated runs cannot establish whether the choices feel compelling.
+
+### Verification
+
+All 24 simulation tests passed. The production build passed with the existing Vite chunk-size warning. The legacy balance sweep completed. Desktop Chromium at 1440 × 900 executed the fusion policy through victory at 88 core, including the Wardkeeper merge and brace report. Browser core and scrap matched the paired headless run after each tested wave.
+
+Touch Chromium at 390 × 844 executed the protected salvage policy through wave 5 at 76 core. It verified touch orders, the Raider route and breach attribution, the marked-attack forecasts, and the aimed-shot report. Neither browser run reported page errors.

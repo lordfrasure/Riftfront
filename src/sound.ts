@@ -20,7 +20,7 @@ export class BattleSound {
     return this.enabled
   }
 
-  play(effect: Effect) {
+  play(effect: Exclude<Effect, { type: 'counter' }>) {
     const context = this.context
     if (!this.enabled || !context || effect.type === 'fall') return
     const time = context.currentTime

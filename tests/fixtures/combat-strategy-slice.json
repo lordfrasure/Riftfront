@@ -1,0 +1,172 @@
+{
+  "conservative": {
+    "preset": "economy",
+    "opening": [
+      [
+        "guard",
+        0,
+        3
+      ],
+      [
+        "guard",
+        1,
+        3
+      ],
+      [
+        "lobber",
+        0,
+        2
+      ]
+    ]
+  },
+  "salvage": {
+    "preset": "economy",
+    "opening": [
+      [
+        "guard",
+        0,
+        3
+      ],
+      [
+        "guard",
+        1,
+        3
+      ],
+      [
+        "scavenger",
+        1,
+        0
+      ]
+    ]
+  },
+  "aggressiveEconomy": {
+    "preset": "doubleSalvage"
+  },
+  "ranged": {
+    "preset": "economy",
+    "opening": [
+      [
+        "guard",
+        0,
+        3
+      ],
+      [
+        "guard",
+        1,
+        3
+      ],
+      [
+        "archer",
+        0,
+        2
+      ]
+    ]
+  },
+  "foundry": {
+    "preset": "economy",
+    "opening": [
+      [
+        "chassis",
+        0,
+        3
+      ],
+      [
+        "guard",
+        1,
+        3
+      ]
+    ],
+    "orders": {
+      "1": [
+        {
+          "type": "upgrade",
+          "id": 1,
+          "upgrade": "bulwark"
+        }
+      ]
+    }
+  },
+  "fusion": {
+    "preset": "economy",
+    "opening": [
+      [
+        "guard",
+        0,
+        3
+      ],
+      [
+        "guard",
+        1,
+        3
+      ],
+      [
+        "archer",
+        0,
+        2
+      ]
+    ],
+    "orders": {
+      "2": [
+        {
+          "type": "place",
+          "kind": "mender",
+          "lane": 0,
+          "slot": 5
+        },
+        {
+          "type": "fuse",
+          "first": 1,
+          "second": 12
+        }
+      ]
+    },
+    "ordersBeforeFollowup": true
+  },
+  "rearward": {
+    "preset": "economy",
+    "opening": [
+      [
+        "guard",
+        0,
+        3
+      ],
+      [
+        "guard",
+        1,
+        3
+      ],
+      [
+        "archer",
+        0,
+        2
+      ]
+    ],
+    "columns": [
+      0,
+      1,
+      2,
+      4
+    ]
+  },
+  "mismatched": {
+    "preset": "economy",
+    "opening": [
+      [
+        "guard",
+        0,
+        3
+      ],
+      [
+        "guard",
+        1,
+        3
+      ],
+      [
+        "saboteur",
+        0,
+        2
+      ]
+    ],
+    "exclude": "lobber"
+  }
+}

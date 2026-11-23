@@ -421,3 +421,65 @@ it('reuses reproducible seeded schedules across policies and reconciles their le
   assert.deepEqual(fixed.scenarios[0].schedule, WAVES)
   assert.equal(fixed.reports[0].runs[0].core, run(strategies.economy).core)
 })
+
+describe('vertical slice encounters', () => {
+  function laneEncounter(waveNumber) {
+    const wave = WAVES[waveNumber - 1]
+    return new Match(LAYOUTS.seven, [{ ...wave, spawns: wave.spawns.filter(spawn => spawn.lane === 0) }])
+  }
+
+  it('marks a Ram impact and catches an adjacent Archer while a spaced Archer stays clear', () => {
+    for (const slot of [2, 1]) {
+      const match = laneEncounter(3)
+      assert.equal(place(match, 'guard', 0, 3), undefined)
+      assert.equal(place(match, 'archer', 0, slot), undefined)
+      let marked = false
+      const effects = finish(match, view => { marked ||= view.enemies.some(enemy => enemy.mark) })
+      assert.ok(marked)
+      assert.equal(effects.filter(effect => effect.type === 'blast').length, 1)
+      const hits = match.lastWave.incidents.filter(event => event.action === 'impact')
+      assert.deepEqual(hits.map(event => [event.defender, event.amount]),
+        slot === 2 ? [['Guard', 27], ['Archer', 31]] : [['Guard', 27]])
+    }
+  })
+
+  it('lets Anchor Frame interrupt impact and Wardkeeper brace for it', () => {
+    for (const fusion of [false, true]) {
+      const match = laneEncounter(3)
+      if (fusion) {
+        assert.equal(place(match, 'guard', 0, 3), undefined)
+        assert.equal(place(match, 'mender', 0, 2), undefined)
+        assert.equal(match.dispatch({ type: 'fuse', first: 1, second: 2 }), undefined)
+      } else {
+        assert.equal(place(match, 'chassis', 0, 3), undefined)
+        assert.equal(match.dispatch({ type: 'upgrade', id: 1, upgrade: 'bulwark' }), undefined)
+      }
+      assert.equal(place(match, fusion ? 'chassis' : 'archer', 0, 1), undefined)
+      const effects = finish(match)
+      assert.ok(match.lastWave.incidents.some(event => event.action === (fusion ? 'brace' : 'interrupt')))
+      assert.equal(effects.filter(effect => effect.type === 'blast').length, fusion ? 1 : 0)
+      if (fusion) assert.equal(match.lastWave.incidents.find(event => event.action === 'impact').amount, 8)
+    }
+  })
+
+  it('locks aimed shots onto a reachable rear defender and cancels a dying Spitter’s shot', () => {
+    const match = laneEncounter(4)
+    assert.equal(place(match, 'guard', 0, 3), undefined)
+    assert.equal(place(match, 'archer', 0, 2), undefined)
+    const marks = new Map()
+    const fired = new Set()
+    finish(match, (view, effects) => {
+      for (const enemy of view.enemies) if (enemy.mark) marks.set(enemy.id, enemy.mark.target)
+      for (const effect of effects) {
+        if (effect.type === 'hit' && effect.style === 'acid' && effect.amount === 36) {
+          assert.equal(effect.target, marks.get(effect.source))
+          fired.add(effect.source)
+        }
+      }
+    })
+    assert.equal(marks.size, 2)
+    assert.equal(fired.size, 1)
+    assert.ok(match.lastWave.incidents.some(event => event.action === 'snipe' && event.defender === 'Archer'))
+    assert.equal(match.lastWave.losses, 0)
+  })
+})

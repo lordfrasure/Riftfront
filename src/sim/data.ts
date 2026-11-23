@@ -70,7 +70,7 @@ export const DEFENDERS: Record<DefenderKind, DefenderDefinition> = {
     hp: 124, color: 0xe2bc80, armor: 2, advance: 75, attack: { damage: 15, range: 37, cooldown: 13 } },
   saboteur: { label: 'Saboteur', role: 'Targets Heralds first and briefly disables their armor aura. Low damage against unescorted enemies.', cost: 41,
     hp: 68, color: 0xe59dc8, attack: { damage: 12, range: 560, cooldown: 18, priority: 'aura', disrupt: 25 } },
-  wardkeeper: { label: 'Wardkeeper', role: 'A shield bearer that repairs another ally while fighting. Shorter healing reach than a Mender.', cost: 0,
+  wardkeeper: { label: 'Wardkeeper', role: 'Braces when targeted by a marked Ram charge and repairs another nearby ally.', cost: 0,
     fused: true, hp: 280, color: 0xb7eda6, armor: 8, advance: 65, attack: { damage: 20, range: 37, cooldown: 13 },
     heal: { amount: 17, range: 270, cooldown: 15 } },
   arcRanger: { label: 'Arc Ranger', role: 'Piercing shots slow and expose the toughest enemy in reach. Covers one target at a time.', cost: 0,
@@ -91,8 +91,8 @@ export const UPGRADES: Record<UpgradeKind, Upgrade> = {
     changes: { hp: 88, attack: { damage: 21, range: 530, cooldown: 6 } } },
   longshot: { base: 'archer', era: 'coil', label: 'Longshot', role: 'Pierces armor and prioritizes the toughest target.', cost: 47,
     changes: { hp: 88, attack: { damage: 57, range: 690, cooldown: 18, pierce: 12, priority: 'toughest' } } },
-  bulwark: { base: 'chassis', label: 'Anchor Frame', cost: 43, role: 'Armored blocker. Slows enemies with short, low-damage strikes.',
-    changes: { hp: 275, armor: 7, advance: 50, attack: { damage: 22, range: 44, cooldown: 13, slow: 22 } } },
+  bulwark: { base: 'chassis', label: 'Anchor Frame', cost: 43, role: 'Armored blocker. Slowing strikes interrupt marked Ram charges.',
+    changes: { hp: 275, armor: 7, advance: 50, attack: { damage: 22, range: 49, cooldown: 13, slow: 22 } } },
   relay: { base: 'chassis', label: 'Spark Relay', cost: 31, role: 'Grants adjacent ranged allies +5 damage. Stays on its pad and has no attack.',
     changes: { hp: 99, armor: 1, advance: undefined, attack: undefined } },
   mortar: { base: 'chassis', label: 'Ash Mortar', cost: 54, era: 'coil', role: 'Long-range shells hit tightly packed enemies. Fragile under direct fire.',
@@ -159,27 +159,33 @@ export const ENEMIES: Record<EnemyKind, EnemyDefinition> = {
     attack: { damage: 26, range: 48, cooldown: 21 }, pulse: { windup: 22, interval: 70, radius: 154, damage: 48 } },
 }
 
-type Pack = readonly [Lane, EnemyKind, number, number, number?]
-interface Spawn { lane: Lane; kind: EnemyKind; tick: number }
+export const SIEGE_ATTACKS = {
+  impact: { windup: 16, radius: 160 },
+  snipe: { windup: 20, radius: 30, reach: 420, damage: 36 },
+} as const
+export type SiegeAttack = keyof typeof SIEGE_ATTACKS
+
+type Pack = readonly [Lane, EnemyKind, number, number, number?, SiegeAttack?]
+interface Spawn { lane: Lane; kind: EnemyKind; tick: number; siege?: SiegeAttack }
 export interface Wave { title: string; tip: string; grant: number; bountyRate: number; spawns: Spawn[] }
 
 function wave(title: string, tip: string, grant: number, bountyRate: number, ...packs: Pack[]): Wave {
-  const spawns = packs.flatMap(([lane, kind, count, tick, gap = 12]) =>
-    Array.from({ length: count }, (_, index) => ({ lane, kind, tick: tick + gap * index })))
+  const spawns = packs.flatMap(([lane, kind, count, tick, gap = 12, siege]) =>
+    Array.from({ length: count }, (_, index) => ({ lane, kind, tick: tick + gap * index, ...(siege && { siege }) })))
   return { title, tip, grant, bountyRate, spawns: spawns.sort((a, b) => a.tick - b.tick) }
 }
 
 export const WAVES = [
-  wave('First Contact', 'Five Raiders hit lane 1 in a tight pack. Lane 2 faces three staggered Raiders. Consider backing up the lane 1 Guard.', 59, 1,
+  wave('First Contact', 'Five Raiders hit lane 1 in a tight pack. Lane 2 faces three staggered Raiders. A lone front risks being surrounded.', 51, 1,
     [0,'raider',5,1,4], [1,'raider',3,10,24]),
-  wave('The Scramble', 'Lane 3 opens. A Lobber can hit an entire Skitter pack at once.', 56, 1,
-    [2,'skitter',6,1,5], [0,'raider',3,9,19], [1,'skitter',5,40,7]),
-  wave('Battering Line', 'Keep fragile units behind the first pad an Iron Ram reaches.', 41, 1,
-    [0,'ram',1,1,42], [0,'raider',3,14], [1,'raider',5,1,10], [2,'skitter',6,30,5]),
-  wave('Acid Rain', 'Spitters shoot from outside melee reach. Coil Age is available this wave.', 42, 1,
-    [0,'spitter',4,1,15], [1,'ram',1,13,45], [1,'raider',4,1], [2,'spitter',3,24,16], [2,'skitter',5,1,6]),
-  wave('The Procession', 'Heralds make every escort tougher while they stay close. Saboteurs can shut down the aura.', 40, 1,
-    [2,'herald',2,1,45], [2,'ram',3,1,31], [0,'skitter',10,1,5], [1,'spitter',5,20,14]),
+  wave('The Scramble', 'Lane 3 opens with a fast Skitter pack. A second rush follows in lane 1 while Raiders trickle into lane 2.', 48, 1,
+    [2,'skitter',6,1,5], [1,'raider',3,9,19], [0,'skitter',5,66,7]),
+  wave('Battering Line', 'Lane 1: a Ram marks a close blast before impact. Anchor Frame can interrupt the charge. Raiders follow behind.', 41, 1,
+    [0,'ram',1,1,42,'impact'], [0,'raider',3,40], [1,'raider',5,1,10], [2,'skitter',6,30,5]),
+  wave('Acid Rain', 'Lane 1: marked Spitters aim at the rearmost defender within 420 reach when the front enters firing range. Coil Age is available.', 42, 1,
+    [0,'spitter',2,1,30,'snipe'], [0,'spitter',2,16,30], [1,'ram',1,13,45], [1,'raider',4,1], [2,'spitter',3,24,16], [2,'skitter',5,1,6]),
+  wave('The Procession', 'Lane 3: Heralds escort armored Rams together. Lane 1 faces a separate swarm.', 56, 1,
+    [2,'herald',2,1,36], [2,'ram',3,5,24], [0,'skitter',10,1,5], [1,'spitter',5,20,14]),
   wave('Broken Rhythm', 'Lanes 1 and 3 need different answers. Reassign specialists with a redeploy.', 42, 0.5,
     [0,'ram',4,1,24], [0,'spitter',4,23,17], [1,'raider',6,10,10], [2,'skitter',13,1,5]),
   wave('Double Pincer', 'Both outer lanes have protected armor. The center is under swarm pressure.', 42, 0.5,
