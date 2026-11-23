@@ -6,6 +6,7 @@ export function portrait(art: FighterArt) {
   const image = document.createElement('img')
   image.className = 'portrait'
   image.alt = ''
+  image.draggable = false
   image.src = fighterImage(art)
   return image
 }

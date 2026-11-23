@@ -46,12 +46,12 @@ See the [paired comparison](BALANCE_REPORT.md#combat-and-strategy-vertical-slice
 
 ### Branching sieges
 
-Use `experiment/branching-sieges`. Build the game with `npm run build`, then run `npm run preview -- --host 127.0.0.1` and open the printed URL. Choose **New seed**, note the number, and play one complete run unaided. Record which front you picked, which reward you passed up, and when you changed the active garrison. If a defender routes, decide whether to repair it or cover its place while it rests.
+Use `experiment/branching-sieges`. Build the game with `npm run build`, then run `npm run preview -- --host 127.0.0.1` and open the printed URL. Choose **Begin siege** and play one complete run unaided. Record which front you picked, which reward you passed up, and when you changed the active garrison. If a defender routes, decide whether to repair it or cover its place while it rests.
 
-Replay that seed using **Play again** or by entering the same number in the briefing. Use a different opening army and choose the other front at the first checkpoint. If you want a reproducible comparison after the blind runs, seed 11 and seed 29 show different advantages for shield and Foundry policies in the lab.
+Replay using **Play again**. Use a different opening army and choose the other front at the first checkpoint.
 
 1. Which front or roster decision was hardest, and did the forecast give you enough information to make it?
 2. Which loss or near miss changed your next plan? Could you recover with a reserve swap, repair, or different front?
-3. Would you begin a third siege voluntarily? Which army and seed would you choose, and why?
+3. Would you begin a third siege voluntarily? Which army and front would you choose, and why?
 
 Decision pending human feedback and owner approval.

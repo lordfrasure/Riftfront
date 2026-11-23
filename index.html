@@ -21,11 +21,6 @@
         <span class="subtitle">Campaign briefing</span>
         <h1 id="brief-title">Hold the<br>Ember Gorge</h1>
         <p>Build a garrison across three lanes, endure ten assaults, and stop the Rift Colossus before it reaches the core.</p>
-        <div class="seed-controls">
-          <label for="run-seed">Siege seed</label>
-          <input id="run-seed" type="number" min="0" max="4294967295" step="1" required>
-          <button id="new-seed">New seed</button>
-        </div>
         <div class="actions">
           <button id="play" class="primary">Begin siege <span aria-hidden="true">→</span></button>
           <button id="review-army">Review defenders</button>
@@ -58,32 +53,49 @@
       </div>
 
       <div class="match">
-        <div class="formation-board">
-          <section class="field" aria-label="Three-lane battlefield">
-            <div class="field-legend" aria-hidden="true"><span>◆ Core</span><span>Rifts ◇</span></div>
-            <div id="game" aria-hidden="true"></div>
-            <div id="pads" role="group" aria-label="Formation pads"></div>
-            <div id="paused" class="paused" hidden>Siege paused</div>
+        <section class="field" aria-label="Three-lane battlefield">
+          <div class="field-legend" aria-hidden="true"><span>◆ Core</span><span>Rifts ◇</span></div>
+          <div id="game" aria-hidden="true"></div>
+          <div id="pads" role="group" aria-label="Formation pads"></div>
+          <div id="paused" class="paused" hidden>Siege paused</div>
+        </section>
+        <section class="workbench" id="workbench" aria-label="Formation orders">
+          <section id="reserve" hidden>
+            <h3>Reserve <span id="reserve-count"></span></h3>
+            <p>Units here sit out the fight and free a garrison slot. Drag ready units back to a pad.</p>
+            <p id="reserve-empty">Drag a deployed unit here to bench it. Routed units rest here for one wave.</p>
+            <div id="reserve-orders"></div>
           </section>
-          <section class="workbench" aria-label="Formation orders">
-            <div class="order-heading"><h2>Formation</h2><p id="feedback" role="status"></p></div>
-            <div id="units" role="group" aria-label="Recruit defenders"></div>
-            <section id="reserve" hidden>
-              <h3>Reserve</h3>
-              <div id="reserve-orders" class="actions"></div>
-            </section>
-          </section>
+          <div id="units" role="group" aria-label="Recruit defenders"></div>
+        </section>
+        <div class="siege-viewbar">
+          <nav class="siege-views" aria-label="Siege views">
+            <button data-view="formation" aria-controls="workbench">Recruits</button>
+            <button data-view="forecast" aria-controls="forecast-panel">Forecast</button>
+            <button data-view="unit" aria-controls="inspector" hidden>Unit</button>
+            <button data-view="fronts" aria-controls="route" hidden>Fronts</button>
+            <button data-view="report" aria-controls="report" hidden>Report</button>
+          </nav>
+          <p id="feedback" role="status"></p>
         </div>
-        <aside class="intel" aria-label="Wave intelligence">
+        <aside class="intel" aria-label="Siege details">
           <div id="inspector" hidden>
-            <img id="unit-portrait" class="portrait" alt="">
-            <div><h2 id="unit-name"></h2><p id="unit-role"></p><ul class="stat-list" id="unit-stats"></ul></div>
-            <p id="unit-links"></p>
+            <div class="unit-summary">
+              <img id="unit-portrait" class="portrait" alt="">
+              <div><h2 id="unit-name"></h2><p id="unit-range"></p></div>
+              <button class="unit-detail-button" popovertarget="unit-details">Stats</button>
+            </div>
             <div id="retrofits" role="group" aria-labelledby="evolution-heading">
               <h3 id="evolution-heading">Evolve</h3>
               <div id="evolution-branches"></div>
             </div>
-            <p id="fusion-rule"></p>
+            <div id="unit-details" popover aria-label="Defender stats and abilities">
+              <button popovertarget="unit-details" popovertargetaction="hide">Close</button>
+              <p id="unit-role"></p>
+              <ul class="stat-list" id="unit-stats"></ul>
+              <p id="unit-links"></p><p id="fusion-rule"></p>
+              <ul id="unit-branch-notes"></ul>
+            </div>
             <div id="fusion-preview" hidden>
               <img id="fusion-portrait" class="portrait" alt="">
               <div><h3 id="fusion-name"></h3><p id="fusion-placement"></p><p id="fusion-role"></p>
@@ -94,7 +106,7 @@
           </div>
           <section id="route" hidden>
             <h2>Choose the next front</h2>
-            <p>Two waves per front. Earn the reward after the first clear.</p>
+            <p>Each front spans two waves. The first clear earns its reward.</p>
             <div id="route-options"></div>
           </section>
           <section id="forecast-panel">

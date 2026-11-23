@@ -1,6 +1,6 @@
 # Riftfront: Ages Under Siege
 
-Form a three-lane garrison, survive ten assaults, and kill the Rift Colossus before it reaches the core. Each wave starts when you give the order. Review the incoming lineup and prepare for the threats that matter in each lane. Enter a siege seed at the briefing to replay its offers, or choose **New seed** to generate another campaign.
+Form a three-lane garrison, survive ten assaults, and kill the Rift Colossus before it reaches the core. Each wave starts when you give the order. Review the incoming lineup and prepare for the threats that matter in each lane. The current playtest uses a repeatable set of front offers.
 
 ## Briefing and debrief
 
@@ -9,11 +9,11 @@ Review the Unit Collection for recruit costs, roles, combat stats, and available
 ## The match
 
 - Begin in the Ember Age with 128 scrap and 100 core integrity. Each lane has seven pads. The core is on the left and the rifts are on the right.
-- Recruit a defender, then select an empty pad. Hover or focus the pad to preview forward reach, including a melee defender’s advance. Inspect an occupied pad to see its stats and orders.
+- Drag a recruit portrait onto an empty pad, or select the recruit and then the pad. Drag a deployed defender to move it. Hover or focus the pad to preview forward reach, including a melee defender’s advance. Inspect an occupied pad to see its stats and orders.
 - Guards and their retrofits advance toward live enemies within a fixed leash. Ranged damage dealers can step forward a little to acquire a target. Closest enemies normally take priority. Enemy melee stops at the first reachable defender, while ranged enemies can engage from farther out.
 - Routed defenders go to reserve after a successful defense. Rest them for one wave or spend 18 scrap to make them ready immediately. Survivors rally to their pads at full health. Core damage persists. A battle that reaches 35 seconds enters overtime. Enemies deal 8 more damage per hit, rising by another 8 every five seconds until the wave resolves.
 - Kills and wave grants pay scrap. Later kills pay smaller bounties as the enemy count rises. A surviving Scavenger pays 11 scrap per completed wave, with a match limit of two Scavengers. Battle duration does not change salvage.
-- Redeploy a defender to an open pad for free, including across lanes. Send a defender to reserve from its inspector, then choose it in the reserve list to deploy it to an empty pad. Retiring returns one third of the base recruit price, rounded down. Upgrade spending has no resale value. Fused defenders have no resale value.
+- Redeploy a defender to an open pad for free, including across lanes. Drag a deployed defender to the reserve tray or use **Send to reserve** in its inspector. Drag a ready portrait to an empty pad, or select it and choose a pad. Resting defenders show the wave when they will be ready. Retiring returns one third of the base recruit price, rounded down. Upgrade spending has no resale value. Fused defenders have no resale value.
 - Starting at wave 4, advancing to the Coil Age costs 36 scrap and unlocks Coilcasters, Guard and Archer retrofits, Ash Mortar, and composite upgrades. Anchor Frame, Spark Relay, and Hush Battery are available in Ember. You can delay the purchase to reinforce a lane first.
 - Active garrison capacity is eight through wave 4, nine through wave 7, and eleven afterward. Scavengers count toward capacity and only pay while deployed and surviving. Fusion frees a place.
 - The wave report lists defeated enemies, routed defenders, synergy-boosted actions, scrap by source, and core damage by lane. It identifies the first routing and breach sources in each lane and highlights marked hits and charge counters. Pause stops the simulation and its combat animations. The 2× toggle advances the same fixed ticks faster. Sound is optional.
