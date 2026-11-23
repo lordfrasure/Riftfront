@@ -383,3 +383,20 @@ describe('expanded formations', () => {
     }
   })
 })
+
+it('reuses reproducible seeded schedules across policies and reconciles their ledgers', async () => {
+  const { buildReport } = await import('./balance-lab.mjs')
+  const args = ['--seeds', '11,29', '--jitter', '8']
+  const { report } = buildReport(args)
+  assert.deepEqual(buildReport(args).report, report)
+  assert.notDeepEqual(report.scenarios[0].schedule, report.scenarios[1].schedule)
+  assert.deepEqual(report.reports[0].runs.map(run => run.seed), [11, 29])
+  const economy = report.reports.find(policy => policy.name === 'economy').runs[0]
+  for (const wave of economy.waves) {
+    assert.equal(wave.openingScrap - wave.spent + wave.refunds + wave.clearBonus + wave.income + wave.bounty, wave.scrap)
+    assert.equal(Object.values(wave.routedByKind).reduce((total, count) => total + count, 0), wave.losses)
+  }
+  const { report: fixed } = buildReport([])
+  assert.deepEqual(fixed.scenarios[0].schedule, WAVES)
+  assert.equal(fixed.reports[0].runs[0].core, run(strategies.economy).core)
+})

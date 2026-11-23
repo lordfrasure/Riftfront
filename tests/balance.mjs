@@ -13,12 +13,12 @@ export const strategies = {
   empty: { opening: [] },
 }
 
-export function plan(match, strategy) {
+export function plan(match, strategy, dispatch = command => match.dispatch(command)) {
   const { layout } = match
-  const columns = layout.slots.length === 7 ? [0, 2, 4, 6] : [0, 2, 3, 5]
+  const columns = strategy.columns ?? (layout.slots.length === 7 ? [0, 2, 4, 6] : [0, 2, 3, 5])
   const put = (kind, lane, slot) => {
     if (kind === strategy.exclude) return
-    return match.dispatch({ type: 'place', kind, lane, slot })
+    return dispatch({ type: 'place', kind, lane, slot })
   }
   const place = (kind, lane, slot) => {
     return put(kind, lane, columns[slot])
@@ -27,22 +27,22 @@ export function plan(match, strategy) {
   if (wave === 1) {
     for (const order of strategy.opening) {
       const [kind, lane, slot] = order
-      const error = strategy.fusion && kind === 'mender' ? put(kind, lane, columns[3] - 1) : place(...order)
+      const error = (strategy.fusion || strategy.fusionInputs) && kind === 'mender' ? put(kind, lane, columns[3] - 1) : place(...order)
       if (error) throw Error(error)
     }
     return
   }
-  if (!strategy.guard) return
+  if (!strategy.guard || wave > (strategy.lastPurchaseWave ?? Infinity)) return
   const unitAt = (lane, slot) => match.view.defenders.find(unit => unit.lane === lane && unit.slot === columns[slot])
   const upgrade = (lane, slot, branch) => {
     const unit = unitAt(lane, slot)
-    if (unit && !unit.upgrade) match.dispatch({ type: 'upgrade', id: unit.id, upgrade: branch })
+    if (branch && unit && !unit.upgrade) dispatch({ type: 'upgrade', id: unit.id, upgrade: branch })
   }
   const lanes = wave === 10 ? [1, 0, 2] : wave <= 2 || wave === 5 ? [2, 1, 0] : [0, 2, 1]
   if (layout.lanes.length === 4) lanes.push(3)
-  if (strategy.fusion) {
+  if (strategy.fusion || strategy.fusionInputs) {
     const fuse = (first, second) => {
-      if (first && second) match.dispatch({ type: 'fuse', first: first.id, second: second.id })
+      if (strategy.fusion && first && second) dispatch({ type: 'fuse', first: first.id, second: second.id })
     }
     const front = unitAt(1, 3)
     const healer = match.view.defenders.find(unit => unit.lane === 1 && unit.kind === 'mender' && unit.slot === columns[3] - 1)
@@ -56,12 +56,12 @@ export function plan(match, strategy) {
     }
   }
   if (strategy.construct && strategy.construct !== 'relay') {
-    if (wave >= 4) match.dispatch({ type: 'advance', era: 'coil' })
+    if (wave >= (strategy.coilWave ?? 4)) dispatch({ type: 'advance', era: 'coil' })
     upgrade(0, strategy.construct === 'bulwark' ? 3 : 2, strategy.construct)
   }
   if (strategy.disrupt && wave >= 5) upgrade(1, 2, 'silencer')
   for (const lane of lanes) place('guard', lane, 3)
-  if (wave >= 4) match.dispatch({ type: 'advance', era: 'coil' })
+  if (wave >= (strategy.coilWave ?? 4)) dispatch({ type: 'advance', era: 'coil' })
   for (const lane of lanes) {
     const enemies = match.waves[wave - 1].spawns.filter(spawn => spawn.lane === lane)
     const swarm = enemies.filter(spawn => spawn.kind === 'skitter').length >= 5
@@ -70,32 +70,32 @@ export function plan(match, strategy) {
   }
   if (wave >= 4) {
     for (const lane of lanes) {
-      if (!strategy.fusion || lane !== 1) upgrade(lane, 2, strategy.archer)
+      if ((!strategy.fusion && !strategy.fusionInputs) || lane !== 1) upgrade(lane, 2, strategy.archer)
       const support = wave === 10 && lane === 1 ? 'mender' : strategy.support
-      if (support === 'mender' && !strategy.fusion && wave < 10) put(support, lane, columns[3] - 1)
+      if (support === 'mender' && !strategy.fusion && !strategy.fusionInputs && wave < 10) put(support, lane, columns[3] - 1)
       else place(support, lane, 1)
     }
   }
   if (wave >= 8 && strategy.support === 'conductor') {
     const support = unitAt(1, 1)
-    if (support && support.kind !== 'mender') match.dispatch({ type: 'retire', id: support.id })
+    if (support && support.kind !== 'mender') dispatch({ type: 'retire', id: support.id })
     place('mender', 1, 1)
   }
   if (wave === 9 && strategy.splash) {
     const escort = unitAt(1, 2)
-    if (escort?.kind === 'lobber') match.dispatch({ type: 'retire', id: escort.id })
+    if (escort?.kind === 'lobber') dispatch({ type: 'retire', id: escort.id })
     place('archer', 1, 2)
     upgrade(1, 2, 'longshot')
   }
   if (wave === 10) {
     const front = unitAt(1, 3)
     if (front?.upgrade === 'vanguard') {
-      match.dispatch({ type: 'retire', id: front.id })
+      dispatch({ type: 'retire', id: front.id })
       place('guard', 1, 3)
       upgrade(1, 3, 'bastion')
     }
     const backup = unitAt(1, 0)
-    if (backup && backup.kind !== 'archer') match.dispatch({ type: 'retire', id: backup.id })
+    if (backup && backup.kind !== 'archer') dispatch({ type: 'retire', id: backup.id })
     place('archer', 1, 0)
     upgrade(1, 0, 'longshot')
   }
@@ -103,7 +103,7 @@ export function plan(match, strategy) {
     const slot = columns[2] - 1
     put('chassis', 0, slot)
     const frame = match.view.defenders.find(unit => unit.lane === 0 && unit.slot === slot)
-    if (frame?.kind === 'chassis' && !frame.upgrade) match.dispatch({ type: 'upgrade', id: frame.id, upgrade: 'relay' })
+    if (frame?.kind === 'chassis' && !frame.upgrade) dispatch({ type: 'upgrade', id: frame.id, upgrade: 'relay' })
   }
   if (strategy.fusion && wave >= 7) {
     upgrade(1, 3, 'wardplate')
@@ -120,10 +120,13 @@ export function plan(match, strategy) {
   }
 }
 
-export function resolve(match) {
+export function resolve(match, onTick) {
   const error = match.dispatch({ type: 'start' })
   if (error) throw Error(error)
-  for (let tick = 0; tick < 3000 && match.view.phase === 'battle'; tick++) match.tick()
+  for (let tick = 0; tick < 3000 && match.view.phase === 'battle'; tick++) {
+    const effects = match.tick()
+    onTick?.(effects)
+  }
   if (match.view.phase === 'battle') throw Error('Wave did not resolve.')
   return match.lastWave
 }
@@ -140,6 +143,17 @@ export function run(strategy, layout) {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  if (process.argv.includes('--lab')) {
+    import('./balance-lab.mjs').then(({ main }) => main(process.argv.slice(2))).catch(error => {
+      console.error(error.message)
+      process.exitCode = 1
+    })
+  } else {
+    legacy()
+  }
+}
+
+function legacy() {
   if (process.argv.includes('--sweep')) {
     const scenarios = {
       economy: strategies.economy,

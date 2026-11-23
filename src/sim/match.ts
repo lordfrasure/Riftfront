@@ -3,7 +3,7 @@ import { applyDamage, selectTarget, type Combatant } from './combat.js'
 import {
   ARMOR_EXPOSURE, CORE_HP, CORE_X, DEFENDERS, ENEMIES, ENTRY_X, ERAS, HERALD_ARMOR, LAYOUTS, SALVAGE_PAYOUT, SCAVENGER_LIMIT,
   OVERTIME_DAMAGE, OVERTIME_RAMP, OVERTIME_TICK, SYNERGIES, STARTING_SCRAP, STEP_MS, UPGRADES, WAVES, profile,
-  type Attack, type DefenderKind, type EnemyKind, type Layout, type Era, type Lane, type Slot, type UpgradeKind,
+  type Attack, type DefenderKind, type EnemyKind, type Layout, type Era, type Lane, type Slot, type UpgradeKind, type Wave,
 } from './data.js'
 
 export const REDEPLOY_COST = 8
@@ -58,15 +58,15 @@ export class Match {
   private activeReport?: WaveReport
   private completedReport?: WaveReport
 
-  readonly waves: readonly (typeof WAVES)[number][]
+  readonly waves: readonly Wave[]
 
-  constructor(readonly layout: Layout = LAYOUTS.seven) {
+  constructor(readonly layout: Layout = LAYOUTS.seven, waves?: readonly Wave[]) {
     // Comparative four-lane campaign moves alternating outer-lane spawns to the extra flank.
-    this.waves = layout.lanes.length === 4 ? WAVES.map(wave => {
+    this.waves = waves ?? (layout.lanes.length === 4 ? WAVES.map(wave => {
       let flank = 0
       return { ...wave, spawns: wave.spawns.map(spawn =>
         spawn.lane === 2 && flank++ % 2 === 1 ? { ...spawn, lane: 3 } : spawn) }
-    }) : WAVES
+    }) : WAVES)
   }
 
   get links() { return formationLinks(this.state.defenders) }

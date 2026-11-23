@@ -1,18 +1,29 @@
 # Riftfront development plan
 
-The [core gameplay expansion](specifications/CORE_GAMEPLAY_EXPANSION.md) controls the next gameplay milestones. The [experience overhaul](specifications/GAME_EXPERIENCE_OVERHAUL.md) remains the product direction.
+The [game design pillars](GAME_DESIGN_PILLARS.md) guide changes. The strategic depth redesign takes priority over the feature sequence in the [core gameplay expansion](specifications/CORE_GAMEPLAY_EXPANSION.md). The [experience overhaul](specifications/GAME_EXPERIENCE_OVERHAUL.md) remains the long-term product direction.
 
-## Repository assessment
+## Current baseline
 
-Milestone 1 shipped the illustrated battlefield, layered fighter rigs, collection, briefing, planning controls and debrief. Reuse those systems and the typed, fixed-tick simulation. The current campaign has ten waves, four pads per lane, six recruits and four Coil retrofits. The board limits support placement and the retrofit system has no early choices, fusion or positional links.
+The current campaign has ten waves, three lanes with seven pads, eight recruits, ten retrofit choices, two fusions, and two positional links. The best evidence of low pressure is that two Guards alone clear the first wave, early salvage pays back after three clears, and three opening policies under the same follow-up rules finish perfectly without routes. The fixed campaign still punishes uncovered lanes and missing mitigation. See the [balance report](BALANCE_REPORT.md) and [strategy matrix](STRATEGY_MATRIX.md).
 
-| Milestone | Scope | Acceptance |
-| --- | --- | --- |
-| 2A. Expanded battlefield and first evolution systems | Compare three layouts, expand formations, add two recruits, three construct branches, two fusions and two positional links. | Complete the ten-wave siege with at least two different formations. Verify purchases, ability behavior, responsive controls, deterministic combat, production build and balance sweep. Stop for playtesting. |
-| 2B. Roster and combination expansion | Build toward 10–12 recruits, four to six fusions, more branches and at least four synergies. Candidate roles include mobile interception and temporary construct deployment. | Validate each addition against existing counters and test winning formations that use different combinations. |
-| 2C. Strategic refinement | Tune enemies, formations, economy and pacing using playtest evidence. | Verify counterplay, discovery and variety with desktop and touch playtests. |
-| 3. Profiles and progression | Versioned local saves, XP, achievements, unlocks and mastery after gameplay stabilizes. | Test migration, corruption recovery and exactly-once rewards. Keep a fresh profile viable. |
-| 4. Replayability | Optional onboarding and challenges informed by playtesting. | Verify discovery and meaningful challenge variation. |
+## Workflow for major gameplay changes
+
+| Stage | Required evidence |
+| --- | --- |
+| Design hypothesis | Record the baseline commit, the decision to improve, expected trade-offs and failure modes, and measurable validation criteria. Name representative policies, encounters, and what human feedback could overturn the hypothesis. |
+| Implementation experiment | Use an isolated Git branch from the recorded baseline. Change the smallest coherent rule or encounter, and preserve a playable control build. |
+| Automated verification | Run tests and production build. Verify changed rules and failure paths. Smoke-test desktop and touch where available and record gaps. |
+| Balance comparison | Compare baseline and candidate with identical policies and scenario keys where possible. Include sensible and deliberately poor choices. Record ledgers, core, casualties, cause and timing of wave failures, and evidence for and against the hypothesis. |
+| Human playtest | Record unaided choices and player feedback in the [playtest log](PLAYTEST_LOG.md). Review difficulty, tension, learnability, and desire to replay. |
+| Accept, revise, or reject | Record the decision and rationale. Acceptance requires human feedback and project-owner approval. Revise on the isolated branch or discard the candidate. Stop before starting the next major experiment until approved. |
+
+## Sequence
+
+1. Establish the laboratory and measure the current game. This report and tooling complete the infrastructure assignment. The next experiment awaits approval.
+2. Test one early encounter that creates an economy trade-off. Follow the proposal in the [balance report](BALANCE_REPORT.md).
+3. Use the result and player feedback to choose the next strategic question. Capacity, recovery, and encounter counterplay remain candidates. Expanded builders, loadouts, progression, and content depend on a playable strategic foundation.
+
+## Historical delivery notes
 
 ## Milestone 2A layout decision
 
